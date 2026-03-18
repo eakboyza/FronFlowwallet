@@ -1,5 +1,4 @@
-
-const CACHE_NAME = 'flowwallet-v1.0.7'; 
+const CACHE_NAME = 'flowwallet-v1.0.7';
 
 self.addEventListener('install', event => {
     console.log('ServiceWorker installing...');
@@ -12,7 +11,6 @@ self.addEventListener('activate', event => {
         caches.keys().then(cacheNames => {
             return Promise.all(
                 cacheNames.map(cache => {
-                    
                     if (cache !== CACHE_NAME) {
                         console.log('Clearing old cache:', cache);
                         return caches.delete(cache);
@@ -47,7 +45,6 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
-
         return response || fetch(event.request);
       })
   );
