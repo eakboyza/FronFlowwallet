@@ -1,5 +1,3 @@
-
-
 let syncQueue = JSON.parse(localStorage.getItem('syncQueue') || '[]');
 
 window.addEventListener('online', function() {
@@ -56,7 +54,7 @@ async function processSyncQueue() {
         } catch (error) {
             console.error('Sync failed:', error);
             failed++;
-            newQueue.push(item);
+            newQueue.push(item); 
         }
     }
     
@@ -130,11 +128,11 @@ const updateLogs = [
         icon: "📝"
     }
 
-    ]
+];
+
 
 function openUpdateLog() {
     console.log("📝 เปิดหน้า Log Update");
-    
     if (isMobile() && sideMenuOpen) {
         closeMobileSideMenu();
     }
@@ -199,8 +197,8 @@ function formatThaiDate(dateString) {
 }
 
 const transferTypes = {
-    INTERNAL: 'internal',
-    AS_INCOME: 'as_income'
+    INTERNAL: 'internal',      
+    AS_INCOME: 'as_income'     
 };
 
         let customCategories = JSON.parse(localStorage.getItem('fin_custom_cats')) || defaultCategories;
@@ -234,11 +232,12 @@ const defaultAccounts = [
 
 let accounts = JSON.parse(localStorage.getItem('fin_accounts')) || defaultAccounts;
 let currentAccountId = localStorage.getItem('fin_current_account') || 'default_acc';
-let accountFilterId = 'all';
-let budgetMode = 'percentage';
+let accountFilterId = 'all'; 
+let budgetMode = 'percentage'; 
 
-let backendTransactions = [];
-let isShowingBackendData = false;
+let backendTransactions = [];  
+let isShowingBackendData = false;  
+
 
         let currentDate = new Date();
         let displayYear = currentDate.getFullYear();
@@ -246,11 +245,12 @@ let isShowingBackendData = false;
 let reportDateRange = {
     startDate: null,
     endDate: null,
-    accountId: 'all',
+    accountId: 'all', 
     isCustomRange: false
 };
-        let analysisPeriod = 'month';
-        let analysisDate = new Date();
+        
+        let analysisPeriod = 'month'; 
+        let analysisDate = new Date(); 
 
         let currentDebtTab = 'active';
         let analysisCharts = {
@@ -261,8 +261,8 @@ let reportDateRange = {
             incomeTrend: null,
             expenseTrend: null
         };
-        let currentPieChartTab = 'categories';
-        let tagPieChart = null;
+        let currentPieChartTab = 'categories'; 
+        let tagPieChart = null; 
 
          let isRefreshing = false;
         const emojiLib = ["💰", "🎁", "💹", "🏦", "🍱", "⛽", "🤝", "👨‍👩‍👧‍👦", "🧺", "🎬", "✈️", "🏥", "🚗", "🍜", "☕", "🍺", "🍦", "🍎", "🛍️", "👗", "👞", "💊", "👶", "🐶", "🎮", "💻", "📷", "🎨", "📚", "🖊️", "⚽", "🚴", "🚲", "🏠", "💡", "🔌", "💳", "💵", "💎", "🛡️", "🔑", "❤️", "⭐", "🍀", "🌈", "🔥", "💯", "✅", "❌", "⚠️", "🔔", "🎵", "🕒", "🍕", "🍔", "🍣", "🍩", "🥤"];
@@ -270,6 +270,7 @@ let reportDateRange = {
         const monthFullNames = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
 async function checkStorageStatus() {
     try {
+     
         let lsReady = false;
         let lsDetails = '';
         let lsItems = 0;
@@ -283,7 +284,7 @@ async function checkStorageStatus() {
                 
                 lsReady = retrieved === 'test';
                 
-                const transactionKeys = ['fin_tx_v5'];
+                const transactionKeys = ['fin_tx_v5']; 
                 
                 lsTransactionCount = transactionKeys.reduce((total, key) => {
                     try {
@@ -292,7 +293,7 @@ async function checkStorageStatus() {
                             return total + data.length;
                         }
                     } catch (e) {
-                        }
+                    }
                     return total;
                 }, 0);
                 
@@ -352,6 +353,7 @@ async function checkStorageStatus() {
             pendingCount = Math.max(0, memoryCount - dbCount);
         } catch (pendingError) {
         }
+        
         const alertMessage = 
 `📊 สถานะระบบจัดเก็บข้อมูล:
 • LocalStorage: ${lsReady ? 'พร้อมใช้งาน' : 'ไม่พร้อม'}
@@ -396,6 +398,7 @@ function closeStorageStatusModal() {
     document.getElementById('storageStatusModal').classList.add('hidden');
 }
 
+
 class FinanceDB {
     constructor() {
         this.db = null;
@@ -405,6 +408,7 @@ class FinanceDB {
         this.initPromise = null;
         this.saveToLocalEnabled = true; 
     }
+
 
     async getTransactionsByDate(dateStr) {
     await this.ensureInitialized();
@@ -501,7 +505,7 @@ class FinanceDB {
                 console.log(`Upgrading database from version ${oldVersion} to ${this.dbVersion}`);
                 
 
-                if (oldVersion < 1) {
+            if (oldVersion < 1) {
                 if (!db.objectStoreNames.contains('transactions')) {
                     const txStore = db.createObjectStore('transactions', {
                         keyPath: 'id',
@@ -536,7 +540,7 @@ class FinanceDB {
                 db.createObjectStore('accounts', { keyPath: 'id' });
                 console.log('✅ Created accounts store (was missing)');
                 }
-                    const requiredStores = ['transactions', 'categories', 'budgets', 'metadata', 'accounts'];
+                const requiredStores = ['transactions', 'categories', 'budgets', 'metadata', 'accounts'];
                 requiredStores.forEach(storeName => {
                     if (!db.objectStoreNames.contains(storeName)) {
                         db.createObjectStore(storeName, { keyPath: storeName === 'metadata' ? 'key' : 'id' });
@@ -566,6 +570,7 @@ class FinanceDB {
         };
     });
 }
+    
     
 async checkAndMigrateFromLocalStorage() {
     try {
@@ -618,7 +623,7 @@ async migrateTransactions(transactions) {
         
         let migrated = 0;
         let errors = 0;
-        let duplicatesSkipped = 0;
+        let duplicatesSkipped = 0; 
         
         const batchSize = 100;
         const batches = Math.ceil(transactions.length / batchSize);
@@ -642,8 +647,8 @@ async migrateTransactions(transactions) {
                 
                 const normalizedTx = {
                     ...tx,
-                    id: uniqueId,
-                    originalId: tx.id,
+                    id: uniqueId, 
+                    originalId: tx.id, 
                     date: tx.date || new Date().toISOString().split('T')[0],
                     monthKey: tx.monthKey || this.getMonthKeyFromDate(tx.date || new Date()),
                     migratedAt: new Date().toISOString()
@@ -732,6 +737,7 @@ async migrateTransactions(transactions) {
         });
     }
     
+    
     async loadRecentToCache() {
         try {
             const sixMonthsAgo = new Date();
@@ -749,10 +755,12 @@ async migrateTransactions(transactions) {
         }
     }
 
+
         setSaveToLocalEnabled(enabled) {
             this.saveToLocalEnabled = enabled;
             console.log(`💾 FinanceDB save to local: ${enabled}`);
         }
+    
     
     async saveTransaction(transaction) {
     await this.ensureInitialized();
@@ -925,6 +933,7 @@ async deleteTransaction(id) {
     }
 }
     
+    
     async saveCategories(categories) {
         await this.ensureInitialized();
         
@@ -985,6 +994,7 @@ async deleteTransaction(id) {
         }
     }
     
+    
     async saveBudgetTargets(targets) {
         await this.ensureInitialized();
         
@@ -1040,6 +1050,7 @@ async deleteTransaction(id) {
         }
     }
     
+    
     async ensureInitialized() {
         if (!this.initialized) {
             await this.init();
@@ -1078,6 +1089,7 @@ async deleteTransaction(id) {
             return false;
         }
     }
+    
     
     async saveToIndexedDB(storeName, data) {
         return new Promise((resolve, reject) => {
@@ -1207,6 +1219,7 @@ async deleteTransaction(id) {
             };
         });
     }
+    
     
     saveToLocalStorageCache(transaction) {
     if (!this.saveToLocalEnabled) {
@@ -1349,6 +1362,7 @@ async deleteTransaction(id) {
         }
     }
     
+    
     updateInMemoryTransactions(transaction) {
     if (!this.saveToLocalEnabled) {
         console.log('⏭️ ข้ามการอัปเดต in-memory (saveToLocalEnabled = false)');
@@ -1366,6 +1380,7 @@ async deleteTransaction(id) {
     removeFromInMemoryTransactions(id) {
         transactions = transactions.filter(t => t.id !== id);
     }
+    
     
     async getDatabaseInfo() {
         await this.ensureInitialized();
@@ -1544,22 +1559,22 @@ financeDB.init().then(success => {
 
 async function loadInitialData() {
     try {
-                const loadedTransactions = await financeDB.getAllTransactions();
+        const loadedTransactions = await financeDB.getAllTransactions();
         
-                if (isLoggedIn) {
-                        transactions = loadedTransactions.filter(t => 
+        if (isLoggedIn) {
+            transactions = loadedTransactions.filter(t => 
                 t.owner_type === 'user' && t.owner_id === currentUser.id
             );
             console.log(`📊 Login: โหลด ${transactions.length} รายการของ user ${currentUser.id}`);
         } else {
-                        const guestId = getGuestId();
+            const guestId = getGuestId();
             transactions = loadedTransactions.filter(t => 
                 t.owner_type === 'guest' && t.owner_id === guestId
             );
             console.log(`📊 Guest: โหลด ${transactions.length} รายการของ guest ${guestId}`);
         }
         
-                const loadedCategories = await financeDB.loadCategories();
+        const loadedCategories = await financeDB.loadCategories();
         customCategories = loadedCategories;
         
         const loadedTargets = await financeDB.loadBudgetTargets();
@@ -1567,7 +1582,7 @@ async function loadInitialData() {
         
         console.log(`📊 Loaded ${transactions.length} transactions`);
         
-                updateUI();
+        updateUI();
         updateCategorySelect();
         
     } catch (error) {
@@ -1577,30 +1592,30 @@ async function loadInitialData() {
 }
 
 function loadFromLocalStorageFallback() {
-        transactions = JSON.parse(localStorage.getItem('fin_tx_v5')) || [];
+    transactions = JSON.parse(localStorage.getItem('fin_tx_v5')) || [];
     customCategories = JSON.parse(localStorage.getItem('fin_custom_cats')) || defaultCategories;
     categoryTargets = JSON.parse(localStorage.getItem('fin_targets_v5')) || {};
 }
 
 async function loadAllMonthsData() {
     try {
-                const allTransactions = await financeDB.getAllTransactions();
+        const allTransactions = await financeDB.getAllTransactions();
         transactions = allTransactions;
         
         console.log(`✅ โหลดข้อมูลครบ ${transactions.length} รายการ จากทุกเดือน`);
         
-                updateUI();
+        updateUI();
         renderCalendar();
         
-                if (!document.getElementById('page-budget').classList.contains('hidden')) {
+        if (!document.getElementById('page-budget').classList.contains('hidden')) {
             updateBudgetUI();
         }
         
-                if (!document.getElementById('page-analysis').classList.contains('hidden')) {
+        if (!document.getElementById('page-analysis').classList.contains('hidden')) {
             refreshAnalysisCharts();
         }
         
-                if (!document.getElementById('page-yearly').classList.contains('hidden')) {
+        if (!document.getElementById('page-yearly').classList.contains('hidden')) {
             updateYearlyUI();
         }
         
@@ -1609,13 +1624,12 @@ async function loadAllMonthsData() {
     }
 }
 
-
 function openMobileForm() {
     const form = document.getElementById('formContainer');
     form.classList.add('mobile-open');
     document.body.style.overflow = 'hidden';
     
-        if (!document.getElementById('mobileCloseBtn')) {
+    if (!document.getElementById('mobileCloseBtn')) {
         const closeBtn = document.createElement('button');
         closeBtn.id = 'mobileCloseBtn';
         closeBtn.innerHTML = '×';
@@ -1630,7 +1644,7 @@ function closeMobileForm() {
     form.classList.remove('mobile-open');
     document.body.style.overflow = 'auto';
     
-        const closeBtn = document.getElementById('mobileCloseBtn');
+    const closeBtn = document.getElementById('mobileCloseBtn');
     if (closeBtn) closeBtn.remove();
 }
 
@@ -1666,55 +1680,55 @@ function manageFormContainer() {
     console.log("🏠 isOverviewPage:", isOverviewPage);
     
     if (isMobileMode) {
-                console.log("📱 Mobile mode detected");
+        console.log("📱 Mobile mode detected");
         
-                if (formPlaceholder && formPlaceholder.contains(formContainer)) {
+        if (formPlaceholder && formPlaceholder.contains(formContainer)) {
             console.log("↪️ Removing form from placeholder");
             formPlaceholder.removeChild(formContainer);
         }
         
-                if (formContainer.parentElement.id !== 'mainContainer') {
+        if (formContainer.parentElement.id !== 'mainContainer') {
             console.log("📦 Moving form to mainContainer");
             document.getElementById('mainContainer').appendChild(formContainer);
         }
         
-                formContainer.classList.add('hidden');
+        formContainer.classList.add('hidden');
         formContainer.classList.remove('lg:col-span-4', 'md:block');
         
-                if (formPlaceholder) {
+        if (formPlaceholder) {
             formPlaceholder.style.display = 'none';
         }
         
     } else {
-                console.log("💻 Desktop mode detected");
+        console.log("💻 Desktop mode detected");
         
         if (isOverviewPage && formPlaceholder) {
-                        console.log("💻 Desktop + Overview - Moving form to placeholder");
+            console.log("💻 Desktop + Overview - Moving form to placeholder");
             
-                        formPlaceholder.style.display = 'block';
+            formPlaceholder.style.display = 'block';
             
-                        formContainer.classList.remove('hidden');
+            formContainer.classList.remove('hidden');
             formContainer.classList.add('lg:col-span-4', 'md:block');
             
-                        if (!formPlaceholder.contains(formContainer)) {
+            if (!formPlaceholder.contains(formContainer)) {
                 console.log("📥 Moving form into placeholder");
                 formPlaceholder.appendChild(formContainer);
             }
             
-                        formContainer.classList.remove('mobile-open');
+            formContainer.classList.remove('mobile-open');
             
         } else {
-                        console.log("💻 Desktop + Other page - Hiding form");
+            console.log("💻 Desktop + Other page - Hiding form");
             
-                        formContainer.classList.add('hidden');
+            formContainer.classList.add('hidden');
             
-                        if (formPlaceholder && formPlaceholder.contains(formContainer)) {
+            if (formPlaceholder && formPlaceholder.contains(formContainer)) {
                 console.log("📤 Removing form from placeholder");
                 formPlaceholder.removeChild(formContainer);
                 document.getElementById('mainContainer').appendChild(formContainer);
             }
             
-                        if (formPlaceholder) {
+            if (formPlaceholder) {
                 formPlaceholder.style.display = 'none';
             }
         }
@@ -1735,12 +1749,12 @@ function openMobileForm() {
     
     const form = document.getElementById('formContainer');
     
-        form.classList.add('mobile-open');
+    form.classList.add('mobile-open');
     form.classList.remove('hidden');
     
-        document.body.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
     
-        if (!document.getElementById('mobileCloseBtn')) {
+    if (!document.getElementById('mobileCloseBtn')) {
         console.log("➕ Adding close button");
         const closeBtn = document.createElement('button');
         closeBtn.id = 'mobileCloseBtn';
@@ -1748,14 +1762,14 @@ function openMobileForm() {
         closeBtn.className = 'absolute top-4 right-4 text-2xl text-slate-400 z-10';
         closeBtn.onclick = closeMobileForm;
         
-                const formInner = form.querySelector('div');
+        const formInner = form.querySelector('div');
         if (formInner) {
             formInner.style.position = 'relative';
             formInner.appendChild(closeBtn);
         }
     }
     
-        setTimeout(() => {
+    setTimeout(() => {
         const amountInput = document.getElementById('amount');
         if (amountInput) amountInput.focus();
     }, 300);
@@ -1768,16 +1782,16 @@ function closeMobileForm() {
     
     const form = document.getElementById('formContainer');
     
-        form.classList.remove('mobile-open');
+    form.classList.remove('mobile-open');
     
-        document.body.style.overflow = 'auto';
+    document.body.style.overflow = 'auto';
     
-        const closeBtn = document.getElementById('mobileCloseBtn');
+    const closeBtn = document.getElementById('mobileCloseBtn');
     if (closeBtn) {
         closeBtn.remove();
     }
     
-        if (!editingTxId) {
+    if (!editingTxId) {
         resetForm();
     }
     
@@ -1791,40 +1805,51 @@ window.addEventListener('resize', function() {
     console.log("🖥️ Window resized");
     manageFormContainer();
     
-        setTimeout(() => {
+    setTimeout(() => {
         updateCopyBudgetButtonText();
-    }, 300); });
+    }, 300); 
+});
 
 window.addEventListener('load', function() {
     console.log("🚀 Page loaded, initializing...");
     
-        console.log("🚀 Page loaded, initializing form...");
+    console.log("🚀 Page loaded, initializing form...");
     setTimeout(() => {
         manageFormContainer();
         
-                const currentPage = getCurrentPage();
+        const currentPage = getCurrentPage();
         console.log("📄 Current page on load:", currentPage);
     }, 200);
     
-            setTimeout(() => {
-                const accountsPage = document.getElementById('page-accounts');
+    setTimeout(() => {
+        const accountsPage = document.getElementById('page-accounts');
         if (accountsPage && !accountsPage.classList.contains('hidden')) {
             console.log("📱 เปิดหน้า accounts มาครั้งแรก, เรียก initTransferForm()");
             initTransferForm();
         }
-    }, 1000); });
+    }, 1000); 
+});
 
 let selectedTransaction = null;
 let mobileFormState = {
-    type: 'expense',               amount: 0,                     category: null,                categoryLabel: '',             note: '',                      date: new Date().toISOString().split('T')[0],     editingId: null            };
+    type: 'expense',           
+    amount: 0,                 
+    category: null,            
+    categoryLabel: '',         
+    note: '',                  
+    date: new Date().toISOString().split('T')[0], 
+    editingId: null            
+};
+
 
 
 function showMobileActionModal(transaction) {
     if (!isMobile()) return;
     
     try {
-                if (typeof transaction === 'string') {
-                        const tx = transactions.find(t => t.id === transaction);
+        
+        if (typeof transaction === 'string') {
+            const tx = transactions.find(t => t.id === transaction);
             if (!tx) {
                 console.error('Transaction not found:', transaction);
                 return;
@@ -1832,15 +1857,15 @@ function showMobileActionModal(transaction) {
             transaction = tx;
         }
         
-                window.selectedTransaction = transaction;
+        window.selectedTransaction = transaction;
         
-                const desc = document.getElementById('actionItemDesc');
+        const desc = document.getElementById('actionItemDesc');
         if (desc) {
             const tag = transaction.tag ? `[${transaction.tag}] ` : '';
             desc.textContent = `${tag}${transaction.desc} - ฿${transaction.amount.toLocaleString()}`;
         }
         
-                document.getElementById('mobileActionModal').classList.remove('hidden');
+        document.getElementById('mobileActionModal').classList.remove('hidden');
         document.body.style.overflow = 'hidden';
         
     } catch (error) {
@@ -1860,23 +1885,23 @@ function openMobileForm(editTransaction = null) {
     console.log("📱 เปิด Mobile Form");
     
     if (editTransaction) {
-                loadTransactionToMobileForm(editTransaction);
+        loadTransactionToMobileForm(editTransaction);
     } else {
-                resetMobileForm();
+        resetMobileForm();
     }
 
-            updateAccountSelect();
+    updateAccountSelect();
     
-        setMobileType(mobileFormState.type);
+    setMobileType(mobileFormState.type);
     
     document.getElementById('mobileFormContainer').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
     
-        renderMobileCategories();
+    renderMobileCategories();
     
-        document.getElementById('mobileDateInput').value = mobileFormState.date;
+    document.getElementById('mobileDateInput').value = mobileFormState.date;
 
-            updateMobileDateDisplay();
+    updateMobileDateDisplay();
 
      if (!editTransaction) {
         const tagInput = document.getElementById('mobileTag');
@@ -1900,16 +1925,19 @@ function resetMobileForm() {
         categoryLabel: '',
         note: '',
         tag: '',
-        date: new Date().toISOString().split('T')[0],         editingId: null,
-        isDebtPayment: false,         originalPaymentId: null     };
+        date: new Date().toISOString().split('T')[0], 
+        editingId: null,
+        isDebtPayment: false, 
+        originalPaymentId: null 
+    };
     
-        updateMobileAmountDisplay();
+    updateMobileAmountDisplay();
     document.getElementById('mobileNote').value = '';
     setMobileType('expense');
 
-        updateMobileDateDisplay();
+    updateMobileDateDisplay();
     
-        document.querySelectorAll('.mobile-category-chip').forEach(chip => {
+    document.querySelectorAll('.mobile-category-chip').forEach(chip => {
         chip.classList.remove('active');
     });
 }
@@ -1922,7 +1950,7 @@ function loadTransactionToMobileForm(transaction) {
     console.log('🔍 desc equals category?:', transaction.desc === transaction.category);
     console.log('🔍 Transaction keys:', Object.keys(transaction));
 
-        const note = transaction.desc && transaction.desc !== transaction.category 
+    const note = transaction.desc && transaction.desc !== transaction.category 
     ? transaction.desc 
     : '';
     
@@ -1939,7 +1967,7 @@ function loadTransactionToMobileForm(transaction) {
         editingId: transaction.id
     };
     
-        if (transaction.isDebtPayment) {
+    if (transaction.isDebtPayment) {
         mobileFormState.isDebtPayment = true;
         mobileFormState.originalPaymentId = transaction.originalPaymentId;
         mobileFormState.originalDebtId = transaction.originalDebtId;
@@ -1965,7 +1993,7 @@ function loadTransactionToMobileForm(transaction) {
 function setMobileType(type) {
     mobileFormState.type = type;
     
-        const incomeBtn = document.getElementById('mobileBtnIncome');
+    const incomeBtn = document.getElementById('mobileBtnIncome');
     const expenseBtn = document.getElementById('mobileBtnExpense');
     
     if (type === 'income') {
@@ -1984,14 +2012,14 @@ function setMobileType(type) {
         incomeBtn.style.color = '';
         expenseBtn.style.color = '';
     }
-        renderMobileCategories();
+    renderMobileCategories();
 }
 
 
 function mobileAddNumber(num) {
     let current = mobileFormState.amount.toString();
     
-        if (current.includes('.')) {
+    if (current.includes('.')) {
         const decimalPart = current.split('.')[1] || '';
         if (decimalPart.length >= 2) {
             showMobileToast("ทศนิยมไม่เกิน 2 ตำแหน่ง");
@@ -1999,17 +2027,17 @@ function mobileAddNumber(num) {
         }
     }
     
-        if (current === '0' && !current.includes('.')) {
+    if (current === '0' && !current.includes('.')) {
         current = '';
     }
     
-        const digits = current.replace('.', '').length;
+    const digits = current.replace('.', '').length;
     if (digits >= 9) {
         showMobileToast("จำนวนเงินสูงสุด 999,999,999");
         return;
     }
     
-        mobileFormState.amount = current + num;
+    mobileFormState.amount = current + num;
         if (!current.includes('.')) {
         mobileFormState.amount = Number(mobileFormState.amount);
     }
@@ -2031,20 +2059,20 @@ function mobileClearLastDigit() {
 function mobileAddDecimalPoint() {
     let current = mobileFormState.amount.toString();
     
-        if (current.includes('.')) {
+    if (current.includes('.')) {
         showMobileToast("มีจุดทศนิยมอยู่แล้ว");
         return;
     }
     
-        if (current.length >= 9) {
+    if (current.length >= 9) {
         showMobileToast("จำนวนเงินสูงสุด 9 หลัก");
         return;
     }
     
-        if (current === '0' || current === '') {
+    if (current === '0' || current === '') {
         mobileFormState.amount = "0.";
     } else {
-                mobileFormState.amount = current + '.';
+        mobileFormState.amount = current + '.';
     }
     
     updateMobileAmountDisplay();
@@ -2055,7 +2083,7 @@ function updateMobileAmountDisplay() {
     if (display) {
         display.textContent = mobileFormState.amount.toLocaleString();
         
-                if (mobileFormState.type === 'income') {
+        if (mobileFormState.type === 'income') {
             display.style.color = '#059669';
         } else {
             display.style.color = '#dc2626';
@@ -2068,14 +2096,14 @@ function renderMobileCategories() {
     const container = document.getElementById('mobileCategoriesContainer');
     if (!container) return;
     
-        let categories = [];
+    let categories = [];
     if (mobileFormState.type === 'income') {
         categories = customCategories.income;
     } else {
         categories = [...customCategories.spending, ...customCategories.investment];
     }
     
-        container.innerHTML = categories.map(cat => `
+    container.innerHTML = categories.map(cat => `
         <div class="mobile-category-chip ${mobileFormState.category === cat.id ? 'active' : ''}"
              onclick="selectMobileCategory('${cat.id}', '${cat.label}')"
              data-category-id="${cat.id}">
@@ -2084,7 +2112,7 @@ function renderMobileCategories() {
         </div>
     `).join('');
     
-        if (mobileFormState.category) {
+    if (mobileFormState.category) {
         const selectedChip = container.querySelector(`[data-category-id="${mobileFormState.category}"]`);
         if (selectedChip) {
             selectedChip.scrollIntoView({ behavior: 'smooth', inline: 'center' });
@@ -2096,7 +2124,7 @@ function selectMobileCategory(categoryId, categoryLabel) {
     mobileFormState.category = categoryId;
     mobileFormState.categoryLabel = categoryLabel;
     
-        document.querySelectorAll('.mobile-category-chip').forEach(chip => {
+    document.querySelectorAll('.mobile-category-chip').forEach(chip => {
         chip.classList.remove('active');
     });
     
@@ -2108,9 +2136,9 @@ function selectMobileCategory(categoryId, categoryLabel) {
 }
 
 function selectMobileCategoryByLabel(label) {
-        let foundCategory = null;
+    let foundCategory = null;
     
-        const allCategories = [
+    const allCategories = [
         ...customCategories.income,
         ...customCategories.spending,
         ...customCategories.investment
@@ -2133,7 +2161,7 @@ function closeMobileDatePicker() {
     const dateInput = document.getElementById('mobileDateInput');
     if (dateInput.value) {
         mobileFormState.date = dateInput.value;
-                updateMobileDateDisplay();
+        updateMobileDateDisplay();
     }
     
     document.getElementById('mobileDatePicker').classList.add('hidden');
@@ -2142,9 +2170,9 @@ function closeMobileDatePicker() {
 
 
 async function saveMobileTransaction() {
-        const amountStr = mobileFormState.amount.toString();
+    const amountStr = mobileFormState.amount.toString();
     
-        let amountValue;
+    let amountValue;
     if (amountStr.includes('.')) {
         amountValue = parseFloat(amountStr);
     } else {
@@ -2156,10 +2184,10 @@ async function saveMobileTransaction() {
         return;
     }
 
-        const tagInput = document.getElementById('mobileTag');
+    const tagInput = document.getElementById('mobileTag');
     const tagValue = tagInput ? tagInput.value.trim() : '';
     
-        const allCats = [
+    const allCats = [
         ...customCategories.income,
         ...customCategories.spending,
         ...customCategories.investment
@@ -2171,19 +2199,19 @@ async function saveMobileTransaction() {
         return;
     }
     
-        const accountSelect = document.getElementById('mobileAccountSelect');
+    const accountSelect = document.getElementById('mobileAccountSelect');
     let accountId = accountSelect ? accountSelect.value : null;
     
-        if (!accountId) {
+    if (!accountId) {
         accountId = currentAccountId;
     }
     
-        if (!accountId) {
+    if (!accountId) {
         const defaultAccount = accounts.find(a => a.isDefault);
         accountId = defaultAccount ? defaultAccount.id : 'default_acc';
     }
 
-        const transaction = {
+    const transaction = {
         id: mobileFormState.editingId || Date.now().toString() + Math.random().toString(36).substr(2, 9),
         amount: amountValue,
         type: mobileFormState.type,
@@ -2196,20 +2224,21 @@ async function saveMobileTransaction() {
         rawDate: mobileFormState.date,
         monthKey: `${new Date(mobileFormState.date).getFullYear()}-${String(new Date(mobileFormState.date).getMonth() + 1).padStart(2, '0')}`,
         date: mobileFormState.date,
-        accountId: accountId,          createdAt: mobileFormState.editingId ? undefined : new Date().toISOString(),
+        accountId: accountId,  
+        createdAt: mobileFormState.editingId ? undefined : new Date().toISOString(),
         updatedAt: new Date().toISOString(),
     };
     
-        if (mobileFormState.editingId && mobileFormState.isDebtPayment && mobileFormState.originalPaymentId) {
+    if (mobileFormState.editingId && mobileFormState.isDebtPayment && mobileFormState.originalPaymentId) {
         console.log('💰 [Mobile] กำลังอัพเดตรายการผ่อนหนี้');
         
-                transaction.isDebtPayment = true;
+        transaction.isDebtPayment = true;
         transaction.originalPaymentId = mobileFormState.originalPaymentId;
         transaction.originalDebtId = mobileFormState.originalDebtId;
         
-                const paymentIndex = payments.findIndex(p => p.id === mobileFormState.originalPaymentId);
+        const paymentIndex = payments.findIndex(p => p.id === mobileFormState.originalPaymentId);
         if (paymentIndex !== -1) {
-                        payments[paymentIndex] = {
+            payments[paymentIndex] = {
                 ...payments[paymentIndex],
                 amount: amountValue,
                 date: mobileFormState.date,
@@ -2225,30 +2254,30 @@ async function saveMobileTransaction() {
     console.log("💾 บันทึกรายการจาก Mobile:", transaction);
     
 try {
-                const result = await financeDB.saveTransaction(transaction);
+        const result = await financeDB.saveTransaction(transaction);
         
         if (result.success) {
-                        if (mobileFormState.editingId) {
-                                const existingIndex = transactions.findIndex(t => t.id === mobileFormState.editingId);
+            if (mobileFormState.editingId) {
+                const existingIndex = transactions.findIndex(t => t.id === mobileFormState.editingId);
                 if (existingIndex !== -1) {
-                                        transactions.splice(existingIndex, 1);
-                                        transactions.unshift(transaction);
+                    transactions.splice(existingIndex, 1);
+                    transactions.unshift(transaction);
                 } else {
                     transactions.unshift(transaction);
                 }
             } else {
-                                const existingIndex = transactions.findIndex(t => t.id === transaction.id);
+                const existingIndex = transactions.findIndex(t => t.id === transaction.id);
                 if (existingIndex !== -1) {
-                                        transactions[existingIndex] = transaction;
+                    transactions[existingIndex] = transaction;
                 } else {
                     transactions.unshift(transaction);
                 }
             }
             
-                        try {
-                                localStorage.setItem('fin_tx_v5', JSON.stringify(transactions.slice(0, 1000)));
+            try {
+                localStorage.setItem('fin_tx_v5', JSON.stringify(transactions.slice(0, 1000)));
                 
-                                const cacheKey = `fin_cache_${transaction.monthKey}`;
+                const cacheKey = `fin_cache_${transaction.monthKey}`;
                 const monthTransactions = transactions.filter(t => t.monthKey === transaction.monthKey);
                 localStorage.setItem(cacheKey, JSON.stringify(monthTransactions));
                 
@@ -2257,23 +2286,25 @@ try {
                 console.warn('⚠️ อัปเดต LocalStorage cache ไม่สำเร็จ:', cacheError);
             }
             
-                        closeMobileForm();
+            closeMobileForm();
             
-                        updateUI();             refreshAnalysisCharts();             
-                        if (!document.getElementById('page-budget').classList.contains('hidden')) {
+            updateUI(); 
+            refreshAnalysisCharts(); 
+            
+            if (!document.getElementById('page-budget').classList.contains('hidden')) {
                 updateBudgetUI();
             }
             
-                        if (!document.getElementById('page-yearly').classList.contains('hidden')) {
+            if (!document.getElementById('page-yearly').classList.contains('hidden')) {
                 updateYearlyUI();
             }
             
-                        const isCalendarTabActive = !document.getElementById('overview-calendar-content').classList.contains('hidden');
+            const isCalendarTabActive = !document.getElementById('overview-calendar-content').classList.contains('hidden');
             if (isCalendarTabActive) {
                 renderCalendar();
             }
             
-                        let toastMsg = mobileFormState.editingId ? "✏️ แก้ไขสำเร็จ" : "✅ บันทึกสำเร็จ";
+            let toastMsg = mobileFormState.editingId ? "✏️ แก้ไขสำเร็จ" : "✅ บันทึกสำเร็จ";
             if (mobileFormState.isDebtPayment) {
                 toastMsg = "💰 อัพเดตการผ่อนหนี้สำเร็จ";
             }
@@ -2291,7 +2322,7 @@ try {
 }
 
 function showMobileToast(message) {
-        const toast = document.createElement('div');
+    const toast = document.createElement('div');
     toast.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl text-sm font-bold z-[300]';
     toast.textContent = message;
     document.body.appendChild(toast);
@@ -2304,40 +2335,41 @@ function showMobileToast(message) {
 function editFromMobileAction() {
     if (!window.selectedTransaction) return;
     
-        closeDayDetailModal();
+    closeDayDetailModal();
     
-        closeMobileActionModal();
+    closeMobileActionModal();
     
-        openMobileForm(window.selectedTransaction);
+    openMobileForm(window.selectedTransaction);
     
-        window.selectedTransaction = null;
+    window.selectedTransaction = null;
 }
 
 async function deleteFromMobileAction() {
     if (!window.selectedTransaction) return;
     
     const id = window.selectedTransaction.id;
-    const transaction = window.selectedTransaction;     
-        const isDebtPayment = transaction.isDebtPayment;
+    const transaction = window.selectedTransaction; 
+    
+    const isDebtPayment = transaction.isDebtPayment;
     const originalPaymentId = transaction.originalPaymentId;
     
-        closeDayDetailModal();
+    closeDayDetailModal();
     
-        closeMobileActionModal();
+    closeMobileActionModal();
     
     showConfirm("ลบรายการ?", "ลบแล้วกู้คืนไม่ได้", async () => { 
         try {
-                        const result = await financeDB.deleteTransaction(id);
+            const result = await financeDB.deleteTransaction(id);
             
             console.log('Delete result:', result);
             
             if (result.success) {
-                                transactions = transactions.filter(t => t.id !== id);
+                transactions = transactions.filter(t => t.id !== id);
                 
-                                if (isDebtPayment && originalPaymentId) {
+                if (isDebtPayment && originalPaymentId) {
                     console.log('🗑️ [Mobile] กำลังลบ payment record:', originalPaymentId);
                     
-                                        const paymentIndex = payments.findIndex(p => p.id === originalPaymentId);
+                    const paymentIndex = payments.findIndex(p => p.id === originalPaymentId);
                     if (paymentIndex !== -1) {
                         payments.splice(paymentIndex, 1);
                         savePaymentsToStorage();
@@ -2346,18 +2378,18 @@ async function deleteFromMobileAction() {
                     }
                 }
                 
-                                updateUI();
+                updateUI();
 
-                                setTimeout(() => bindHistoryItemEvents(), 100);
+                setTimeout(() => bindHistoryItemEvents(), 100);
                 
-                                const isCalendarTabActive = !document.getElementById('overview-calendar-content').classList.contains('hidden');
+                const isCalendarTabActive = !document.getElementById('overview-calendar-content').classList.contains('hidden');
                 if (isCalendarTabActive) {
                     renderCalendar();
                 }
                 
-                                refreshAnalysisCharts();
+                refreshAnalysisCharts();
                 
-                                if (isDebtPayment) {
+                if (isDebtPayment) {
                     showToast("✅ ลบรายการผ่อนหนี้สำเร็จ (ทั้งสองฝั่ง)");
                 } else {
                     showToast("✅ ลบรายการสำเร็จ");
@@ -2376,7 +2408,7 @@ async function deleteFromMobileAction() {
         }
     });
     
-        window.selectedTransaction = null;
+    window.selectedTransaction = null;
 }
 
 
@@ -2398,9 +2430,9 @@ function openMobileFormFromFab() {
     console.log("🎯 FAB clicked");
     
     if (checkIsMobile()) {
-                openMobileForm();
+        openMobileForm();
     } else {
-                const currentPage = getCurrentPage();
+        const currentPage = getCurrentPage();
         if (currentPage !== 'overview') {
             switchPage('overview');
             showToast("เปลี่ยนไปหน้าการบันทึกรายการ");
@@ -2411,14 +2443,14 @@ function openMobileFormFromFab() {
 }
 
 document.addEventListener('click', function(e) {
-        if (e.target.id === 'submitBtn' || e.target.closest('#submitBtn')) {
-                setTimeout(function() {
+    if (e.target.id === 'submitBtn' || e.target.closest('#submitBtn')) {
+        setTimeout(function() {
             if (isMobileMode && document.getElementById('formContainer').classList.contains('mobile-open')) {
                 closeMobileForm();
             }
-        }, 500);     }
+        }, 500); 
+    }
 });
-
 
 document.addEventListener('touchstart', function(e) {
     if (e.touches.length > 1) e.preventDefault();
@@ -2471,12 +2503,12 @@ window.onload = () => {
     updateAccountSelect();
     updateAccountFilterDropdown();
     
-        if (financeDB) {
+    if (financeDB) {
         financeDB.init().then(() => {
             console.log("✅ FinanceDB พร้อมใช้งานแล้ว");
             
-                        fixNullAccountIds().then(() => {
-                                loadInitialData().then(() => {
+            fixNullAccountIds().then(() => {
+                loadInitialData().then(() => {
                     updateUI();
                     renderCalendar();
                     
@@ -2524,25 +2556,26 @@ function bindHistoryItemEvents() {
     console.log(`Found ${historyItems.length} history items to bind`);
     
     historyItems.forEach(item => {
-                item.removeEventListener('click', handleHistoryItemClick);
+        item.removeEventListener('click', handleHistoryItemClick);
         
-                item.addEventListener('click', handleHistoryItemClick);
+        item.addEventListener('click', handleHistoryItemClick);
     });
     
-        const dayDetailItems = document.querySelectorAll('#dayDetailList > div[onclick]');
+    const dayDetailItems = document.querySelectorAll('#dayDetailList > div[onclick]');
     dayDetailItems.forEach(item => {
         const oldOnClick = item.getAttribute('onclick');
         if (oldOnClick && oldOnClick.includes('showMobileActionModal')) {
-                        item.setAttribute('data-has-click', 'true');
+            item.setAttribute('data-has-click', 'true');
         }
     });
 }
 
 function handleHistoryItemClick(event) {
-    if (!isMobile()) return;     
-        event.stopPropagation();
+    if (!isMobile()) return; 
     
-        const item = event.currentTarget;
+    event.stopPropagation();
+    
+    const item = event.currentTarget;
     const transactionId = item.getAttribute('data-transaction-id');
     
     if (!transactionId) {
@@ -2550,7 +2583,7 @@ function handleHistoryItemClick(event) {
         return;
     }
     
-        const transaction = transactions.find(t => t.id === transactionId);
+    const transaction = transactions.find(t => t.id === transactionId);
     
     if (transaction) {
         showMobileActionModal(transaction);
@@ -2559,7 +2592,7 @@ function handleHistoryItemClick(event) {
     }
 }
 
-        function switchOverviewTab(tab) {
+function switchOverviewTab(tab) {
     console.log(`switchOverviewTab called with tab: ${tab}`);
     const histBtn = document.getElementById('tab-history-btn');
     const calBtn = document.getElementById('tab-calendar-btn');
@@ -2578,23 +2611,26 @@ function handleHistoryItemClick(event) {
         histCont.classList.add('hidden');
         setTimeout(() => {
             renderCalendar();
-                        updateCalendarAccountIndicator();
+            updateCalendarAccountIndicator();
         }, 50);
     }
 }
 
-                function formatCompactNumber(number) {
+        function formatCompactNumber(number) {
             if (number === 0 || number === null || number === undefined) return "0";
             if (number >= 1000000) {
                 return Math.floor(number / 1000000) + 'M';
-                                           }
+            
+            }
             if (number >= 1000) {
                 return Math.floor(number / 1000) + 'k';
-                                            }
+       
+            }
             return number.toLocaleString('th-TH');
         }
 
-        function renderCalendar() {
+    
+function renderCalendar() {
     console.log("🔍 [CALENDAR] Starting render...");
     
     const grid = document.getElementById('calendarGrid');
@@ -2607,31 +2643,32 @@ function handleHistoryItemClick(event) {
     const month = currentDate.getMonth();
     const keyPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
     
-        let monthTxs = transactions.filter(t => t.monthKey === keyPrefix);
+    let monthTxs = transactions.filter(t => t.monthKey === keyPrefix);
     
-        if (accountFilterId !== 'all') {
+    if (accountFilterId !== 'all') {
         monthTxs = monthTxs.filter(t => 
-            t.accountId === accountFilterId ||              (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
+            t.accountId === accountFilterId ||  
+            (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
         );
     }
     
     console.log(`📊 [CALENDAR] Using ${monthTxs.length} transactions (filter: ${accountFilterId})`);
     
-       
+    
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     
     grid.innerHTML = '';
     
-        for (let i = 0; i < firstDay; i++) {
+    for (let i = 0; i < firstDay; i++) {
         grid.innerHTML += `<div class="calendar-day not-current bg-slate-50/10 rounded-lg"></div>`;
     }
 
-        for (let day = 1; day <= daysInMonth; day++) {
+    for (let day = 1; day <= daysInMonth; day++) {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const dayTxs = monthTxs.filter(t => t.rawDate === dateStr);
         
-         console.log(`Day ${day}:`, {
+        console.log(`Day ${day}:`, {
             date: dateStr,
             transactions: dayTxs.length,
             amounts: dayTxs.map(t => ({type: t.type, amount: t.amount})),
@@ -2640,16 +2677,18 @@ function handleHistoryItemClick(event) {
         });
 
 
-        const incAmount = dayTxs.filter(t => 
+const incAmount = dayTxs.filter(t => 
     t.type === 'income' && 
-    !t.isTransferTransaction  ).reduce((s, t) => s + t.amount, 0);
+    !t.isTransferTransaction  
+).reduce((s, t) => s + t.amount, 0);
 
 const expAmount = dayTxs.filter(t => 
     t.type === 'expense' && 
-    !t.isTransferTransaction  ).reduce((s, t) => s + t.amount, 0);
+    !t.isTransferTransaction  
+).reduce((s, t) => s + t.amount, 0);
         
-                
-                const numbers = `
+        
+const numbers = `
     <div class="flex gap-1 mt-1">
         ${incAmount > 0 ? '<div class="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>' : ''}
         ${expAmount > 0 ? '<div class="w-1.5 h-1.5 rounded-full bg-rose-500"></div>' : ''}
@@ -2672,17 +2711,17 @@ async function openDayDetail(dateStr) {
     console.log(`📅 Opening day detail for ${dateStr}`);
     
     try {
-                let dayTxs = [];
+        let dayTxs = [];
         
         if (financeDB && financeDB.db) {
-                        dayTxs = await financeDB.getTransactionsByDate(dateStr);
+            dayTxs = await financeDB.getTransactionsByDate(dateStr);
             console.log(`💾 Loaded ${dayTxs.length} transactions from IndexedDB`);
         } else {
-                        dayTxs = transactions.filter(t => t.rawDate === dateStr);
+            dayTxs = transactions.filter(t => t.rawDate === dateStr);
             console.log(`💾 Loaded ${dayTxs.length} transactions from memory`);
         }
         
-                if (accountFilterId !== 'all') {
+        if (accountFilterId !== 'all') {
             dayTxs = dayTxs.filter(t => 
                 t.accountId === accountFilterId || 
                 (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
@@ -2690,10 +2729,11 @@ async function openDayDetail(dateStr) {
             console.log(`🎯 After account filter: ${dayTxs.length} transactions`);
         }
         
-                dayTxs.sort((a, b) => {
-                        const timeA = new Date(a.createdAt || a.updatedAt || a.date || 0).getTime();
+        dayTxs.sort((a, b) => {
+            const timeA = new Date(a.createdAt || a.updatedAt || a.date || 0).getTime();
             const timeB = new Date(b.createdAt || b.updatedAt || b.date || 0).getTime();
-            return timeB - timeA;         });
+            return timeB - timeA; 
+        });
 
         if (dayTxs.length === 0) {
             console.log(`ℹ️ No transactions found for ${dateStr}`);
@@ -2716,7 +2756,7 @@ async function openDayDetail(dateStr) {
         } else {
             container.innerHTML = dayTxs
     .filter(t => {
-                return accountFilterId === 'all' || 
+        return accountFilterId === 'all' || 
                (t.accountId === accountFilterId) ||
                (t.type === 'transfer' && t.accountId === accountFilterId) ||
                (t.type === 'income' && t.isTransferIncome && t.accountId === accountFilterId);
@@ -2730,8 +2770,7 @@ async function openDayDetail(dateStr) {
                     const minutes = time.getMinutes().toString().padStart(2, '0');
                     timeInfo = `<span class="text-[7px] text-slate-400 ml-1">${hours}:${minutes}</span>`;
                 }
-                
-                                const onClickAction = isMobile() 
+                const onClickAction = isMobile() 
                     ? `onclick="showMobileActionModal(${JSON.stringify(t).replace(/"/g, '&quot;')})"`
                     : '';
 return `
@@ -2775,9 +2814,9 @@ return `
     } catch (error) {
         console.error('Error opening day detail:', error);
         
-                showToast("❌ โหลดข้อมูลไม่สำเร็จ: " + error.message);
+        showToast("❌ โหลดข้อมูลไม่สำเร็จ: " + error.message);
         
-                const displayDate = new Date(dateStr).toLocaleDateString('th-TH', { 
+        const displayDate = new Date(dateStr).toLocaleDateString('th-TH', { 
             day: 'numeric', 
             month: 'long', 
             year: 'numeric' 
@@ -2801,12 +2840,12 @@ function editDayTransaction(id, isDebtPayment = false, originalPaymentId = '') {
     const t = transactions.find(tx => tx.id === id);
     if (!t) return;
     
-        closeDayDetailModal();
+    closeDayDetailModal();
     
     if (isMobile()) {
-                openMobileForm(t);
+        openMobileForm(t);
     } else {
-                editingTxId = id;
+        editingTxId = id;
         document.getElementById('formTitle').innerText = "แก้ไข";
         document.getElementById('submitBtn').innerText = "อัปเดต";
         document.getElementById('cancelEditBtn').classList.remove('hidden');
@@ -2818,9 +2857,9 @@ function editDayTransaction(id, isDebtPayment = false, originalPaymentId = '') {
         document.getElementById('transDate').value = t.rawDate;
         document.getElementById('category').value = t.category;
         
-                if (isDebtPayment && originalPaymentId) {
+        if (isDebtPayment && originalPaymentId) {
             console.log('📅 [Calendar] กำลังแก้ไขรายการผ่อนหนี้จากวันDetail, paymentId:', originalPaymentId);
-                        window.editingDebtPaymentId = originalPaymentId;
+            window.editingDebtPaymentId = originalPaymentId;
         } else {
             window.editingDebtPaymentId = null;
         }
@@ -2834,7 +2873,7 @@ function editDayTransaction(id, isDebtPayment = false, originalPaymentId = '') {
 }
 
 async function deleteDayTransaction(id, dateStr) {
-        if (isMobile()) {
+    if (isMobile()) {
         const transaction = transactions.find(t => t.id === id);
         if (transaction) {
             showMobileActionModal(transaction);
@@ -2842,23 +2881,23 @@ async function deleteDayTransaction(id, dateStr) {
         return;
     }
     
-        showConfirm("ลบรายการ?", "ลบแล้วกู้คืนไม่ได้", async () => {
+    showConfirm("ลบรายการ?", "ลบแล้วกู้คืนไม่ได้", async () => {
         try {
-                        const transactionToDelete = transactions.find(t => t.id === id);
+            const transactionToDelete = transactions.find(t => t.id === id);
             const isDebtPayment = transactionToDelete?.isDebtPayment;
             const originalPaymentId = transactionToDelete?.originalPaymentId;
             
-                        const result = await financeDB.deleteTransaction(id);
+            const result = await financeDB.deleteTransaction(id);
             
             console.log('Delete day transaction result:', result);
             
             if (result.success) {
-                                transactions = transactions.filter(t => t.id !== id);
+                transactions = transactions.filter(t => t.id !== id);
                 
-                                if (isDebtPayment && originalPaymentId) {
+                if (isDebtPayment && originalPaymentId) {
                     console.log('🗑️ [Calendar] กำลังลบ payment record:', originalPaymentId);
                     
-                                        const paymentIndex = payments.findIndex(p => p.id === originalPaymentId);
+                    const paymentIndex = payments.findIndex(p => p.id === originalPaymentId);
                     if (paymentIndex !== -1) {
                         payments.splice(paymentIndex, 1);
                         savePaymentsToStorage();
@@ -2867,16 +2906,17 @@ async function deleteDayTransaction(id, dateStr) {
                     }
                 }
                 
-                                updateUI();
+                updateUI();
                 
-                                if (!document.getElementById('dayDetailModal').classList.contains('hidden')) {
-                    openDayDetail(dateStr);                 }
+                if (!document.getElementById('dayDetailModal').classList.contains('hidden')) {
+                    openDayDetail(dateStr); 
+                }
                 
-                                renderCalendar();
+                renderCalendar();
                 
-                                refreshAnalysisCharts();
+                refreshAnalysisCharts();
                 
-                                if (isDebtPayment) {
+                if (isDebtPayment) {
                     showToast("🗑️ ลบรายการผ่อนหนี้จากปฏิทินสำเร็จ (ทั้งสองฝั่ง)");
                 } else {
                     showToast("🗑️ ลบรายการจากปฏิทินสำเร็จ");
@@ -2897,12 +2937,13 @@ async function deleteDayTransaction(id, dateStr) {
 }
 
 
-        function updateUI() {
+
+function updateUI() {
     const key = getMonthKey(); 
     console.log(`🔄 updateUI() - เดือน: ${key}, isLoggedIn: ${isLoggedIn}, isShowingBackendData: ${isShowingBackendData}`);
     console.log(`📊 backendTransactions: ${backendTransactions.length} รายการ, transactions: ${transactions.length} รายการ`);
     
-        let sourceTransactions = transactions;
+    let sourceTransactions = transactions;
     
     if (isLoggedIn) {
         if (backendTransactions.length > 0) {
@@ -2911,17 +2952,17 @@ async function deleteDayTransaction(id, dateStr) {
             console.log(`📊 แสดงข้อมูลจาก backend: ${backendTransactions.length} รายการ`);
         } else {
             console.log('⚠️ backendTransactions ว่าง แต่ isLoggedIn = true');
-                        sourceTransactions = transactions;
+            sourceTransactions = transactions;
             console.log(`📊 แสดงข้อมูลจาก local ชั่วคราว: ${transactions.length} รายการ`);
         }
     } else {
         console.log(`📊 แสดงข้อมูลจาก local: ${transactions.length} รายการ`);
     }
     
-        let filtered = sourceTransactions.filter(t => t.monthKey === key);
+    let filtered = sourceTransactions.filter(t => t.monthKey === key);
     console.log(`📊 หลังจากกรองเดือน ${key}: ${filtered.length} รายการ`);
     
-        if (filtered.length === 0 && sourceTransactions.length > 0) {
+    if (filtered.length === 0 && sourceTransactions.length > 0) {
         console.log('⚠️ ไม่มีรายการในเดือนนี้ แต่มีรายการทั้งหมด:', sourceTransactions.map(t => ({
             id: t.id,
             monthKey: t.monthKey,
@@ -2932,12 +2973,13 @@ async function deleteDayTransaction(id, dateStr) {
     }
     
     if (accountFilterId !== 'all') {
-        filtered = filtered.filter(t => 
-        t.accountId === accountFilterId ||          (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
+    filtered = filtered.filter(t => 
+        t.accountId === accountFilterId || 
+        (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
     );
 }
     
-        filtered.sort((a, b) => {
+    filtered.sort((a, b) => {
         const dateA = new Date(a.rawDate || a.date || 0);
         const dateB = new Date(b.rawDate || b.date || 0);
         
@@ -2950,13 +2992,13 @@ async function deleteDayTransaction(id, dateStr) {
         return dateB - dateA;
     });
 
-        const inc = filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+    const inc = filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
     const exp = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     
     document.getElementById('totalIncome').innerText = `฿${inc.toLocaleString()}`;
     document.getElementById('totalExpense').innerText = `฿${exp.toLocaleString()}`;
     
-        let bal;
+    let bal;
     if (accountFilterId === 'all') {
         const realIncome = filtered.filter(t => 
             t.type === 'income' && !t.isTransferIncome
@@ -2999,7 +3041,7 @@ async function refreshDataAfterSave() {
     balEl.innerText = `฿${Math.abs(bal).toLocaleString()}`; 
     balEl.style.color = bal < 0 ? '#FB7185' : '#34D399';
     
-        const list = document.getElementById('historyList');
+    const list = document.getElementById('historyList');
     
     if(filtered.length === 0) { 
         list.innerHTML = `<div class="p-8 text-center text-slate-300 text-xs italic">ไม่มีรายการ</div>`; 
@@ -3084,7 +3126,7 @@ async function refreshDataAfterSave() {
         list.innerHTML = html;
     }
     
-        const isCalendarTabActive = !document.getElementById('overview-calendar-content').classList.contains('hidden');
+    const isCalendarTabActive = !document.getElementById('overview-calendar-content').classList.contains('hidden');
     const isOverviewPage = !document.getElementById('page-overview').classList.contains('hidden');
     
     if (isOverviewPage && isCalendarTabActive) {
@@ -3099,7 +3141,7 @@ function calculateTotalBudget(targets, income, mode) {
     let totalInvestment = 0;
     
     if (mode === 'percentage') {
-                let spendPct = 0;
+        let spendPct = 0;
         let investPct = 0;
         
         Object.entries(targets).forEach(([catId, target]) => {
@@ -3121,7 +3163,7 @@ function calculateTotalBudget(targets, income, mode) {
 totalSpending = adjustedIncome * (spendPct / 100);
 totalInvestment = adjustedIncome * (investPct / 100);
     } else {
-                Object.entries(targets).forEach(([catId, target]) => {
+        Object.entries(targets).forEach(([catId, target]) => {
             const cat = [...customCategories.spending, ...customCategories.investment]
                 .find(c => c.id === catId);
             if (!cat) return;
@@ -3136,7 +3178,7 @@ totalInvestment = adjustedIncome * (investPct / 100);
                     totalSpending += value;
                 }
             } else if (target.mode === 'percentage') {
-                                if (isInvestment) {
+                if (isInvestment) {
                     totalInvestment += income * (value / 100);
                 } else {
                     totalSpending += income * (value / 100);
@@ -3150,48 +3192,54 @@ totalInvestment = adjustedIncome * (investPct / 100);
 
 
 
-        function updateBudgetUI() {
+function updateBudgetUI() {
     const key = getMonthKey(); 
     
-        let filtered = transactions.filter(t => t.monthKey === key);
+    let filtered = transactions.filter(t => t.monthKey === key);
     
-       if (accountFilterId !== 'all') {
+   if (accountFilterId !== 'all') {
         filtered = filtered.filter(t => 
-            t.accountId === accountFilterId ||              (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
+            t.accountId === accountFilterId ||  
+            (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
         );
     }
-     let income = 0;
+    let income = 0;
     
     if (accountFilterId === 'all') {
-                income = filtered.filter(t => 
+        income = filtered.filter(t => 
             t.type === 'income' && !t.isTransferIncome
         ).reduce((s, t) => s + t.amount, 0);
         
     } else {
-                        const realIncome = filtered.filter(t => 
+  
+        const realIncome = filtered.filter(t => 
             t.type === 'income' && 
             t.accountId === accountFilterId &&
             !t.isTransferIncome
         ).reduce((s, t) => s + t.amount, 0);
         
-                const transferIncome = filtered.filter(t => 
+    
+        const transferIncome = filtered.filter(t => 
             t.type === 'income' && 
             t.accountId === accountFilterId &&
-            t.isTransferIncome === true          ).reduce((s, t) => s + t.amount, 0);
+            t.isTransferIncome === true  
+        ).reduce((s, t) => s + t.amount, 0);
         
-                const transferOut = filtered.filter(t => 
+        const transferOut = filtered.filter(t => 
             t.type === 'transfer' && 
             t.accountId === accountFilterId
         ).reduce((s, t) => s + t.amount, 0);
         
-                income = Math.max(0, realIncome + transferIncome - transferOut);
+        income = Math.max(0, realIncome + transferIncome - transferOut);
     }
-    
+
             const targets = categoryTargets[key] || {};
 
-        let tSpend = 0;     let tInvest = 0;     
+    let tSpend = 0; 
+    let tInvest = 0; 
+    
     if (budgetMode === 'percentage') {
-                let spendPct = 0;
+        let spendPct = 0;
         customCategories.spending.forEach(c => {
             const targetValue = targets[c.id]?.value ?? c.default;
             if (targetValue !== null && targetValue !== undefined) {
@@ -3201,12 +3249,12 @@ totalInvestment = adjustedIncome * (investPct / 100);
         tSpend = income * (spendPct / 100);
         tInvest = Math.max(0, income - tSpend);
     } else {
-                customCategories.spending.forEach(c => {
+        customCategories.spending.forEach(c => {
             const target = targets[c.id];
             if (target && target.mode === 'fixed') {
                 tSpend += target.value || 0;
             } else if (target && target.mode === 'percentage') {
-                                tSpend += income * (target.value / 100);
+                tSpend += income * (target.value / 100);
             }
         });
         
@@ -3225,7 +3273,7 @@ totalInvestment = adjustedIncome * (investPct / 100);
 
     
     
-        document.getElementById('summary-spending-amount').innerText = `฿${tSpend.toLocaleString()}`;
+    document.getElementById('summary-spending-amount').innerText = `฿${tSpend.toLocaleString()}`;
     document.getElementById('summary-spending-percent-badge').innerText = 
         budgetMode === 'percentage' ? `${Math.round((tSpend / income) * 100)}%` : 'คงที่';
     
@@ -3246,25 +3294,27 @@ totalInvestment = adjustedIncome * (investPct / 100);
  const render = (cats, el, isInv) => {
     el.innerHTML = cats.map(c => {
         const target = targets[c.id];
-        const targetValue = target?.value ?? c.default;         const targetMode = target?.mode || 'percentage';
+        const targetValue = target?.value ?? c.default; 
+        const targetMode = target?.mode || 'percentage';
 
-                const hasValue = targetValue !== null && targetValue !== undefined;
+        const hasValue = targetValue !== null && targetValue !== undefined;
         
-                let budgetAmount;
+        let budgetAmount;
         if (targetMode === 'percentage') {
             budgetAmount = isInv ? (tInvest * (targetValue / 100)) : (income * (targetValue / 100));
         } else {
-            budgetAmount = targetValue || 0;         }
+            budgetAmount = targetValue || 0; 
+        }
         
         const a = filtered.filter(tr => tr.category === c.label).reduce((s, tr) => s + tr.amount, 0);
         const r = budgetAmount - a; 
         const prog = budgetAmount > 0 ? Math.min((a / budgetAmount) * 100, 100) : 0;
         
-                let statusHtml = isInv ? 
+        let statusHtml = isInv ? 
             (r <= 0 ? 'ครบแล้ว' : 'ขาด ฿' + Math.abs(r).toLocaleString()) : 
             (r < 0 ? 'เกิน ฿' + Math.abs(r).toLocaleString() : 'เหลือ ฿' + Math.abs(r).toLocaleString());
         
-                let targetDisplay = '';
+        let targetDisplay = '';
         if (targetMode === 'percentage') {
             argetDisplay = hasValue ? `${targetValue}%` : '-- %';
         } else {
@@ -3304,16 +3354,16 @@ return `<div onclick="openPortionModal('${c.id}', ${isInv})" class="bg-white p-4
             render(customCategories.spending, document.getElementById('grid-spending'), false);
             render(customCategories.investment, document.getElementById('grid-investment'), true);
         }
-        checkBudgetAlerts();
-        function checkBudgetAlerts() {
+checkBudgetAlerts();
+function checkBudgetAlerts() {
     const key = getMonthKey();
     
-        let filtered = transactions.filter(t => 
+    let filtered = transactions.filter(t => 
         t.monthKey === key && 
         t.type !== 'transfer'
     );
     
-        if (accountFilterId !== 'all') {
+    if (accountFilterId !== 'all') {
         filtered = filtered.filter(t => t.accountId === accountFilterId);
     }
     const income = filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
@@ -3321,7 +3371,7 @@ return `<div onclick="openPortionModal('${c.id}', ${isInv})" class="bg-white p-4
     
     let alertMessages = [];
     
-        customCategories.spending.forEach(c => {
+    customCategories.spending.forEach(c => {
         const ratio = targets[c.id]?.value ?? (c.default || 0);
         const budget = income * (ratio / 100);
         const actual = filtered.filter(tr => tr.category === c.label).reduce((s, tr) => s + tr.amount, 0);
@@ -3330,12 +3380,13 @@ return `<div onclick="openPortionModal('${c.id}', ${isInv})" class="bg-white p-4
             const overAmount = actual - budget;
             const overPercentage = Math.round((overAmount / budget) * 100);
             
-            if (overPercentage >= 10) {                 alertMessages.push(`⚠️ งบประมาณ <b>${c.label}</b> เกิน <b>${overPercentage}%</b> (เกิน ฿${overAmount.toLocaleString()})`);
+            if (overPercentage >= 10) { 
+                alertMessages.push(`⚠️ งบประมาณ <b>${c.label}</b> เกิน <b>${overPercentage}%</b> (เกิน ฿${overAmount.toLocaleString()})`);
             }
         }
     });
     
-        const totalSpending = filtered.filter(t => t.type === 'expense' && 
+    const totalSpending = filtered.filter(t => t.type === 'expense' && 
         customCategories.spending.some(c => c.label === t.category)).reduce((s, t) => s + t.amount, 0);
     const totalInvestment = filtered.filter(t => t.type === 'expense' && 
         customCategories.investment.some(c => c.label === t.category)).reduce((s, t) => s + t.amount, 0);
@@ -3351,10 +3402,10 @@ return `<div onclick="openPortionModal('${c.id}', ${isInv})" class="bg-white p-4
         }
     }
     
-        if (alertMessages.length > 0) {
-                        showToast(alertMessages[0].replace(/<[^>]*>/g, ''));
+    if (alertMessages.length > 0) {
+        showToast(alertMessages[0].replace(/<[^>]*>/g, ''));
         
-                console.log("Budget Alerts:", alertMessages);
+        console.log("Budget Alerts:", alertMessages);
     }
 }
 
@@ -3362,9 +3413,10 @@ return `<div onclick="openPortionModal('${c.id}', ${isInv})" class="bg-white p-4
 
 
 function copyBudgetFromPreviousMonth() {
-    const currentMonth = getMonthKey();     const [currentYear, currentMonthNum] = currentMonth.split('-').map(Number);
+    const currentMonth = getMonthKey(); 
+    const [currentYear, currentMonthNum] = currentMonth.split('-').map(Number);
     
-        let prevYear = currentYear;
+    let prevYear = currentYear;
     let prevMonthNum = currentMonthNum - 1;
     
     if (prevMonthNum === 0) {
@@ -3374,7 +3426,7 @@ function copyBudgetFromPreviousMonth() {
     
     const prevMonthKey = `${prevYear}-${String(prevMonthNum).padStart(2, '0')}`;
     
-        const previousBudget = categoryTargets[prevMonthKey];
+    const previousBudget = categoryTargets[prevMonthKey];
     
     if (!previousBudget || Object.keys(previousBudget).length === 0) {
         showConfirm(
@@ -3385,27 +3437,27 @@ function copyBudgetFromPreviousMonth() {
         return;
     }
     
-        const currentMonthName = monthFullNames[currentMonthNum - 1];
+    const currentMonthName = monthFullNames[currentMonthNum - 1];
     const prevMonthName = monthFullNames[prevMonthNum - 1];
     
     showConfirm(
         `คัดลอกงบประมาณจาก ${prevMonthName} มา ${currentMonthName}?`,
         "ค่าทั้งหมดจะถูกคัดลอกและเขียนทับค่าเดิมในเดือนนี้ (ถ้ามี)",
         () => {
-                        categoryTargets[currentMonth] = JSON.parse(JSON.stringify(previousBudget));
+            categoryTargets[currentMonth] = JSON.parse(JSON.stringify(previousBudget));
             
-                        localStorage.setItem('fin_targets_v5', JSON.stringify(categoryTargets));
+            localStorage.setItem('fin_targets_v5', JSON.stringify(categoryTargets));
             
-                        updateBudgetUI();
+            updateBudgetUI();
             
-                        showToast(`✅ คัดลอกงบประมาณจาก ${prevMonthName} สำเร็จ`);
+            showToast(`✅ คัดลอกงบประมาณจาก ${prevMonthName} สำเร็จ`);
             
-                        hideConfirm();
+            hideConfirm();
         }
     );
 }
 
-        
+
 
 function getAnalysisData() {
     console.log("🔍 getAnalysisData() called");
@@ -3445,8 +3497,9 @@ function getAnalysisData() {
         (t.type === 'income' || t.type === 'expense')
     );
     
-        if (accountFilterId !== 'all') {
-        filtered = filtered.filter(t => t.accountId === accountFilterId);      }
+    if (accountFilterId !== 'all') {
+        filtered = filtered.filter(t => t.accountId === accountFilterId);  
+    }
     
     console.log("📝 Filtered Transactions:", filtered.length);
     
@@ -3503,7 +3556,7 @@ const savingRate = totalIncome > 0 ? (totalInvestmentActual / totalIncome) * 100
         }
     });
 
-            Object.keys(spendingByTag).forEach(tag => {
+    Object.keys(spendingByTag).forEach(tag => {
         spendingByTag[tag].categories = Array.from(spendingByTag[tag].categories);
         spendingByTag[tag].avgAmount = spendingByTag[tag].amount / spendingByTag[tag].count;
     });
@@ -3571,10 +3624,10 @@ function generateTagColors(count) {
 function getTagAnalysisData() {
     const data = getAnalysisData();
     
-        const tagStats = {};
+    const tagStats = {};
     let totalTagExpense = 0;
     
-        data.expense.forEach(expense => {
+    data.expense.forEach(expense => {
         if (expense.tag && expense.tag.trim() !== '') {
             const tag = expense.tag.trim();
             if (!tagStats[tag]) {
@@ -3594,22 +3647,22 @@ function getTagAnalysisData() {
         }
     });
     
-        Object.keys(tagStats).forEach(tag => {
+    Object.keys(tagStats).forEach(tag => {
         tagStats[tag].avgAmount = tagStats[tag].amount / tagStats[tag].count;
         tagStats[tag].categoryCount = tagStats[tag].categories.size;
         tagStats[tag].categories = Array.from(tagStats[tag].categories);
     });
     
-        const sortedTags = Object.keys(tagStats)
+    const sortedTags = Object.keys(tagStats)
         .map(tag => ({
             tag,
             ...tagStats[tag]
         }))
         .sort((a, b) => b.amount - a.amount);
     
-        const topTags = sortedTags.slice(0, 5);
+    const topTags = sortedTags.slice(0, 5);
     
-        const mostFrequentTag = sortedTags.sort((a, b) => b.count - a.count)[0];
+    const mostFrequentTag = sortedTags.sort((a, b) => b.count - a.count)[0];
     
     return {
         tagStats,
@@ -3626,13 +3679,13 @@ function updateTagAnalysisUI() {
     console.log("🔄 updateTagAnalysisUI START");
     
     try {
-                const tagData = getTagAnalysisData();
+        const tagData = getTagAnalysisData();
         
-                updateTopTagsList(tagData);
+        updateTopTagsList(tagData);
         
-                updateTagComparisonChart(tagData);
+        updateTagComparisonChart(tagData);
         
-                updateTagStats(tagData);
+        updateTagStats(tagData);
         
         console.log("✅ updateTagAnalysisUI END - แสดงข้อมูล TAG สำหรับเดือน:", 
                    `${analysisDate.getFullYear()}-${analysisDate.getMonth() + 1}`);
@@ -3661,12 +3714,12 @@ function updateTopTagsList(tagData) {
         const percentage = totalExpense > 0 ? (tag.amount / totalExpense) * 100 : 0;
         const width = Math.min(percentage * 2, 100);
         
-                const rankColors = [
+        const rankColors = [
             'bg-purple-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-orange-500'
         ];
         const rankColor = rankColors[index] || 'bg-slate-500';
         
-                const rankIcons = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+        const rankIcons = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
         const rankIcon = rankIcons[index] || '🏷️';
         
         return `
@@ -3708,32 +3761,32 @@ function updateTagComparisonChart(tagData) {
     
     if (!container) return;
     
-        if (!tagData.hasTagData) {
+    if (!tagData.hasTagData) {
         canvas.style.display = 'none';
         
-                const existingMessage = container.querySelector('.no-data-message-tag');
+        const existingMessage = container.querySelector('.no-data-message-tag');
         if (existingMessage) return;
         
-                const message = document.createElement('div');
+        const message = document.createElement('div');
         message.className = 'no-data-message-tag h-64 flex items-center justify-center text-slate-400 text-sm italic';
         message.textContent = 'ไม่มีข้อมูล TAG สำหรับแสดงกราฟ';
         container.appendChild(message);
         return;
     }
     
-        canvas.style.display = 'block';
+    canvas.style.display = 'block';
     
-        const noDataMsg = container.querySelector('.no-data-message-tag');
+    const noDataMsg = container.querySelector('.no-data-message-tag');
     if (noDataMsg) noDataMsg.remove();
     
-        const top8Tags = tagData.sortedTags.slice(0, 8);
+    const top8Tags = tagData.sortedTags.slice(0, 8);
     const labels = top8Tags.map(t => `#${t.tag}`);
     const amounts = top8Tags.map(t => t.amount);
     const colors = generateColors(top8Tags.length);
     
     const ctx = canvas.getContext('2d');
     
-        if (analysisCharts.tagComparison) {
+    if (analysisCharts.tagComparison) {
         analysisCharts.tagComparison.data.labels = labels;
         analysisCharts.tagComparison.data.datasets[0].data = amounts;
         analysisCharts.tagComparison.data.datasets[0].backgroundColor = colors;
@@ -3813,11 +3866,11 @@ function updateTagComparisonChart(tagData) {
 }
 
 function updateTagStats(tagData) {
-        const totalTagsEl = document.getElementById('totalTagsCount');
+    const totalTagsEl = document.getElementById('totalTagsCount');
     if (totalTagsEl) {
         totalTagsEl.textContent = tagData.totalTags;
         
-                if (tagData.totalTags >= 10) {
+        if (tagData.totalTags >= 10) {
             totalTagsEl.style.color = '#8b5cf6';
         } else if (tagData.totalTags >= 5) {
             totalTagsEl.style.color = '#3b82f6';
@@ -3826,7 +3879,7 @@ function updateTagStats(tagData) {
         }
     }
     
-        const mostUsedTagEl = document.getElementById('mostUsedTag');
+    const mostUsedTagEl = document.getElementById('mostUsedTag');
     if (mostUsedTagEl && tagData.mostFrequentTag) {
         const tag = tagData.mostFrequentTag;
         mostUsedTagEl.innerHTML = `
@@ -3837,7 +3890,7 @@ function updateTagStats(tagData) {
 }
 
 function updateTagInsights(data) {
-        const tagData = getTagAnalysisData();
+    const tagData = getTagAnalysisData();
     
     if (!tagData.hasTagData) {
         return [];
@@ -3846,7 +3899,7 @@ function updateTagInsights(data) {
     const insights = [];
     const topTag = tagData.topTags[0];
     
-        if (topTag) {
+    if (topTag) {
         const totalExpense = data.totalExpense;
         const tagPercentage = (topTag.amount / totalExpense) * 100;
         
@@ -3858,7 +3911,7 @@ function updateTagInsights(data) {
         });
     }
     
-        if (tagData.totalTags > 0) {
+    if (tagData.totalTags > 0) {
         const avgPerTag = data.totalExpense / tagData.totalTags;
         
         if (tagData.totalTags >= 10) {
@@ -3921,15 +3974,16 @@ function getMonthlyTrends(monthsCount, analysisDate) {
         const month = date.getMonth();
         const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
         
-                let monthTransactions = transactions.filter(t => 
+        let monthTransactions = transactions.filter(t => 
             t.monthKey === monthKey && 
             t.type !== 'transfer'
         );
         
-                if (accountFilterId !== 'all') {
-            monthTransactions = monthTransactions.filter(t => t.accountId === accountFilterId);          }
+        if (accountFilterId !== 'all') {
+            monthTransactions = monthTransactions.filter(t => t.accountId === accountFilterId);  
+        }
         
-                const monthIncome = monthTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+        const monthIncome = monthTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
         const monthExpense = monthTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
         
         trends.push({
@@ -3939,7 +3993,7 @@ function getMonthlyTrends(monthsCount, analysisDate) {
             income: monthIncome,
             expense: monthExpense,
             balance: monthIncome - monthExpense,
-                        filtered: accountFilterId !== 'all' ? `(filtered: ${accountFilterId})` : '',
+            filtered: accountFilterId !== 'all' ? `(filtered: ${accountFilterId})` : '',
             transactionCount: monthTransactions.length
         });
     }
@@ -3956,13 +4010,13 @@ function debugAnalysisPage() {
     console.log("🔍 ===== ANALYSIS PAGE DEBUG ===== 🔍");
     console.log("Timestamp:", new Date().toLocaleString());
     
-        console.log("\n📊 1. ข้อมูลพื้นฐาน");
+    console.log("\n📊 1. ข้อมูลพื้นฐาน");
     console.log("- Current Page:", getCurrentPage());
     console.log("- Analysis Period:", analysisPeriod);
     console.log("- Analysis Date:", analysisDate.toLocaleDateString('th-TH'));
     console.log("- Current Month:", getMonthKey());
     
-        console.log("\n📝 2. ข้อมูล Transaction");
+    console.log("\n📝 2. ข้อมูล Transaction");
     const currentMonthKey = getMonthKey();
     const monthTransactions = transactions.filter(t => t.monthKey === currentMonthKey);
     console.log("- รายการทั้งหมด:", monthTransactions.length, "รายการ");
@@ -3970,7 +4024,7 @@ function debugAnalysisPage() {
     console.log("- รายการรายจ่าย:", monthTransactions.filter(t => t.type === 'expense').length);
     console.log("- รายการโอนเงิน:", monthTransactions.filter(t => t.type === 'transfer').length);
     
-        console.log("\n📈 3. ข้อมูล Analysis");
+    console.log("\n📈 3. ข้อมูล Analysis");
     const analysisData = getAnalysisData();
     
     console.log("- รายรับรวม:", analysisData.totalIncome.toLocaleString());
@@ -3978,7 +4032,7 @@ function debugAnalysisPage() {
     console.log("- ยอดคงเหลือ:", analysisData.balance.toLocaleString());
     console.log("- อัตราการออม:", analysisData.savingRate.toFixed(1) + "%");
     
-        console.log("\n🏷️ 4. หมวดหมู่รายจ่าย");
+    console.log("\n🏷️ 4. หมวดหมู่รายจ่าย");
     const categories = Object.entries(analysisData.spendingByCategory);
     if (categories.length > 0) {
         categories.forEach(([cat, data]) => {
@@ -3988,14 +4042,14 @@ function debugAnalysisPage() {
         console.log("  - ไม่มีข้อมูลรายจ่าย");
     }
     
-        console.log("\n📊 5. สถานะกราฟ");
+    console.log("\n📊 5. สถานะกราฟ");
     console.log("- spendingPieChart:", analysisCharts.spendingPie ? "✅ พร้อมใช้งาน" : "❌ ไม่พร้อม");
     console.log("- incomeExpenseChart:", analysisCharts.incomeExpense ? "✅ พร้อมใช้งาน" : "❌ ไม่พร้อม");
     console.log("- categoryComparisonChart:", analysisCharts.categoryComparison ? "✅ พร้อมใช้งาน" : "❌ ไม่พร้อม");
     console.log("- incomeTrendChart:", analysisCharts.incomeTrend ? "✅ พร้อมใช้งาน" : "❌ ไม่พร้อม");
     console.log("- expenseTrendChart:", analysisCharts.expenseTrend ? "✅ พร้อมใช้งาน" : "❌ ไม่พร้อม");
     
-        console.log("\n🎯 6. การตั้งค่า UI");
+    console.log("\n🎯 6. การตั้งค่า UI");
     const activeTab = document.querySelector('.analysis-tab-btn.active');
     console.log("- แท็บที่เลือก:", activeTab ? activeTab.id.replace('a-tab-', '') : "ไม่มี");
     console.log("- แท็บที่แสดง:", Array.from(document.querySelectorAll('[id^="a-content-"]'))
@@ -4003,7 +4057,7 @@ function debugAnalysisPage() {
         .map(el => el.id.replace('a-content-', ''))
         .join(', ') || "ไม่มี");
     
-        console.log("\n❤️ 7. สุขภาพการเงิน");
+    console.log("\n❤️ 7. สุขภาพการเงิน");
     const healthData = calculateFinancialHealthScore(analysisData);
     console.log("- คะแนน:", healthData.score + "/100");
     console.log("- องค์ประกอบ:", JSON.stringify(healthData.components));
@@ -4011,13 +4065,13 @@ function debugAnalysisPage() {
     console.log("- อัตรารายจ่าย:", healthData.expenseRatio.toFixed(1) + "%");
     console.log("- ความถี่:", healthData.transactionFrequency.toFixed(1), "รายการ/วัน");
     
-        console.log("\n⚠️ 8. ตรวจสอบปัญหา");
+    console.log("\n⚠️ 8. ตรวจสอบปัญหา");
     
-        if (analysisData.filtered.length === 0) {
+    if (analysisData.filtered.length === 0) {
         console.log("❌ ไม่มีข้อมูล transaction ในช่วงเวลานี้");
     }
     
-        if (analysisData.totalIncome === 0) {
+    if (analysisData.totalIncome === 0) {
         console.log("⚠️ ยังไม่มีข้อมูลรายรับ");
     }
     
@@ -4025,7 +4079,7 @@ function debugAnalysisPage() {
         console.log("⚠️ ยังไม่มีข้อมูลรายจ่าย");
     }
     
-        const chartElements = [
+    const chartElements = [
         'spendingPieChart',
         'incomeExpenseChart',
         'categoryComparisonChart',
@@ -4047,7 +4101,7 @@ function debugAnalysisPage() {
 }
 
 function calculateFinancialHealthScore(data) {
-        if (!data || data.totalIncome === 0) {
+    if (!data || data.totalIncome === 0) {
         return {
             score: 0,
             components: {
@@ -4061,28 +4115,37 @@ function calculateFinancialHealthScore(data) {
         };
     }
     
-        const savingRate = data.savingRate || 0;
+    const savingRate = data.savingRate || 0;
     let savingScore;
     if (savingRate >= 20) {
-        savingScore = 40;     } else if (savingRate <= 0) {
-        savingScore = 0;     } else {
-        savingScore = (savingRate / 20) * 40;     }
+        savingScore = 40; 
+    } else if (savingRate <= 0) {
+        savingScore = 0; 
+    } else {
+        savingScore = (savingRate / 20) * 40; 
+    }
     
-        const expenseRatio = data.expenseRatio || 0;
+    const expenseRatio = data.expenseRatio || 0;
     let expenseScore;
     if (expenseRatio <= 80) {
-        expenseScore = 40;     } else if (expenseRatio >= 100) {
-        expenseScore = 0;     } else {
-        expenseScore = ((100 - expenseRatio) / 20) * 40;     }
+        expenseScore = 40; 
+    } else if (expenseRatio >= 100) {
+        expenseScore = 0; 
+    } else {
+        expenseScore = ((100 - expenseRatio) / 20) * 40;
+    }
     
-        const transactionFrequency = data.transactionsPerDay || 0;
+    const transactionFrequency = data.transactionsPerDay || 0;
     let frequencyScore;
     if (transactionFrequency >= 0.5) {
-        frequencyScore = 20;     } else if (transactionFrequency <= 0) {
-        frequencyScore = 0;     } else {
-        frequencyScore = (transactionFrequency / 0.5) * 20;     }
+        frequencyScore = 20; 
+    } else if (transactionFrequency <= 0) {
+        frequencyScore = 0; 
+    } else {
+        frequencyScore = (transactionFrequency / 0.5) * 20; 
+    }
     
-        const totalScore = Math.min(100, Math.max(0, 
+    const totalScore = Math.min(100, Math.max(0, 
         savingScore + expenseScore + frequencyScore
     ));
     
@@ -4100,26 +4163,30 @@ function calculateFinancialHealthScore(data) {
 }
 
 function updateFinancialHealthScore(data) {
-        const healthData = calculateFinancialHealthScore(data);
+    const healthData = calculateFinancialHealthScore(data);
     const score = healthData.score;
     
-        const scoreElement = document.getElementById('financialHealthScore');
+    const scoreElement = document.getElementById('financialHealthScore');
     if (scoreElement) {
         scoreElement.innerText = `${score}/100`;
         
-                if (score >= 80) {
-            scoreElement.style.color = '#10b981';         } else if (score >= 60) {
-            scoreElement.style.color = '#f59e0b';         } else if (score >= 40) {
-            scoreElement.style.color = '#FFA726';         } else {
-            scoreElement.style.color = '#ef4444';         }
+        if (score >= 80) {
+            scoreElement.style.color = '#10b981'; 
+        } else if (score >= 60) {
+            scoreElement.style.color = '#f59e0b'; 
+        } else if (score >= 40) {
+            scoreElement.style.color = '#FFA726'; 
+        } else {
+            scoreElement.style.color = '#ef4444'; 
+        }
     }
     
-        const prevData = getPreviousPeriodData();
+    const prevData = getPreviousPeriodData();
     if (prevData && prevData.totalIncome > 0) {
         const prevHealthData = calculateFinancialHealthScore(prevData);
         const scoreChange = score - prevHealthData.score;
         
-                const iconEl = document.getElementById('healthTrendIcon');
+        const iconEl = document.getElementById('healthTrendIcon');
         const textEl = document.getElementById('healthTrendText');
         
         if (iconEl && textEl) {
@@ -4143,26 +4210,26 @@ function updateFinancialHealthScore(data) {
     }
 }
 
-        
+
 function updateAnalysisUI() {
     console.log("=== DEBUG: updateAnalysisUI START ===");
     
-        updateAnalysisPeriodText();
+    updateAnalysisPeriodText();
     
-        const data = getAnalysisData();
+    const data = getAnalysisData();
     
-        updateAnalysisStats(data);
+    updateAnalysisStats(data);
 
-        updateTagPieChart();
+    updateTagPieChart();
     
-        const activeTab = document.querySelector('.analysis-tab-btn.active');
+    const activeTab = document.querySelector('.analysis-tab-btn.active');
     if (!activeTab) {
-                document.getElementById('a-tab-overview').classList.add('active');
+        document.getElementById('a-tab-overview').classList.add('active');
         document.getElementById('a-content-overview').classList.remove('hidden');
     } else {
         const tabId = activeTab.id.replace('a-tab-', '');
         
-                switch(tabId) {
+        switch(tabId) {
             case 'overview':
                 updateSpendingPieChart(data);
                 updateIncomeExpenseChart(data);
@@ -4191,7 +4258,7 @@ function getSpendingByDayOfWeek(filteredTransactions) {
     const days = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
     const result = [];
     
-        for (let i = 0; i < days.length; i++) {
+    for (let i = 0; i < days.length; i++) {
         result.push({ 
             day: days[i], 
             amount: 0, 
@@ -4199,13 +4266,15 @@ function getSpendingByDayOfWeek(filteredTransactions) {
         });
     }
     
-        const expenses = filteredTransactions.filter(t => 
-        t.type === 'expense'      );
+    const expenses = filteredTransactions.filter(t => 
+        t.type === 'expense'  
+    );
     
     expenses.forEach(t => {
         const date = new Date(t.rawDate);
-        const dayOfWeek = date.getDay();         
-                if (dayOfWeek >= 0 && dayOfWeek < 7) {
+        const dayOfWeek = date.getDay(); 
+        
+        if (dayOfWeek >= 0 && dayOfWeek < 7) {
             result[dayOfWeek].amount += t.amount;
             result[dayOfWeek].count++;
         }
@@ -4236,7 +4305,7 @@ function updateAnalysisPeriodText() {
         }
 
 function updateAnalysisStats(data) {
-        document.getElementById('avgIncomePerDay').innerText = `฿${Math.round(data.avgIncomePerDay).toLocaleString()}`;
+    document.getElementById('avgIncomePerDay').innerText = `฿${Math.round(data.avgIncomePerDay).toLocaleString()}`;
     document.getElementById('avgExpensePerDay').innerText = `฿${Math.round(data.avgExpensePerDay).toLocaleString()}`;
     const investmentActual = data.expense.filter(t => 
     customCategories.investment.some(c => c.label === t.category)
@@ -4248,14 +4317,14 @@ const investmentRate = data.totalIncome > 0 ?
 document.getElementById('investmentRate').innerText = `${investmentRate.toFixed(1)}%`;
     document.getElementById('transactionsPerDay').innerText = data.transactionsPerDay.toFixed(1);
     
-        const prevData = getPreviousPeriodData();
+    const prevData = getPreviousPeriodData();
     updateTrendIndicators(data, prevData);
     
-        updateFinancialHealthScore(data);
+    updateFinancialHealthScore(data);
 }
 
         function getPreviousPeriodData() {
-        const prevDate = new Date(analysisDate);
+    const prevDate = new Date(analysisDate);
     
     switch(analysisPeriod) {
         case 'month':
@@ -4269,27 +4338,27 @@ document.getElementById('investmentRate').innerText = `${investmentRate.toFixed(
             break;
     }
     
-        const originalDate = new Date(analysisDate);
+    const originalDate = new Date(analysisDate);
     
-        const tempDate = analysisDate;
+    const tempDate = analysisDate;
     analysisDate = prevDate;
     const prevData = getAnalysisData();
     
-        analysisDate = originalDate;
+    analysisDate = originalDate;
     
     return prevData;
 }
 
         function updateTrendIndicators(currentData, prevData) {
-                        const incomeChange = prevData.totalIncome > 0 ? 
+            const incomeChange = prevData.totalIncome > 0 ? 
                 ((currentData.totalIncome - prevData.totalIncome) / prevData.totalIncome) * 100 : 0;
             updateTrendElement('income', incomeChange);
             
-                        const expenseChange = prevData.totalExpense > 0 ? 
+            const expenseChange = prevData.totalExpense > 0 ? 
                 ((currentData.totalExpense - prevData.totalExpense) / prevData.totalExpense) * 100 : 0;
             updateTrendElement('expense', expenseChange);
             
-            const currentInvestmentActual = currentData.expense.filter(t => 
+const currentInvestmentActual = currentData.expense.filter(t => 
     customCategories.investment.some(c => c.label === t.category)
 ).reduce((sum, t) => sum + t.amount, 0);
 
@@ -4305,7 +4374,7 @@ const prevInvestmentRate = prevData.totalIncome > 0 ?
 const investmentChange = currentInvestmentRate - prevInvestmentRate;
 updateTrendElement('investment', investmentChange);
             
-                        const transChange = prevData.filtered.length > 0 ? 
+            const transChange = prevData.filtered.length > 0 ? 
                 ((currentData.filtered.length - prevData.filtered.length) / prevData.filtered.length) * 100 : 0;
             updateTrendElement('trans', transChange);
         }
@@ -4339,7 +4408,7 @@ updateTrendElement('investment', investmentChange);
 function updateSpendingPieChart(data) {
     console.log('📊 updateSpendingPieChart() called');
     
-        const container = document.getElementById('pieChartCategoriesContainer');
+    const container = document.getElementById('pieChartCategoriesContainer');
     const canvas = document.getElementById('spendingPieChart');
     
     if (!container) {
@@ -4347,21 +4416,21 @@ function updateSpendingPieChart(data) {
         return;
     }
     
-        const hasData = Object.keys(data.spendingByCategory).length > 0;
+    const hasData = Object.keys(data.spendingByCategory).length > 0;
     
     if (!hasData) {
         console.log('⚠️ No data for spendingPieChart - HIDING canvas');
         
-                if (canvas) {
+        if (canvas) {
             canvas.style.display = 'none';
         }
         
-                const existingMessage = container.querySelector('.no-data-message-pie');
+        const existingMessage = container.querySelector('.no-data-message-pie');
         if (existingMessage) {
             return;
         }
         
-                const message = document.createElement('div');
+        const message = document.createElement('div');
         message.className = 'no-data-message-pie h-64 flex items-center justify-center text-slate-400 text-sm italic';
         message.textContent = 'ไม่มีข้อมูลรายจ่าย';
         container.appendChild(message);
@@ -4369,24 +4438,24 @@ function updateSpendingPieChart(data) {
         return;
     }
     
-        console.log('✅ Has data for pie chart');
+    console.log('✅ Has data for pie chart');
     
-        const noDataMsg = container.querySelector('.no-data-message-pie');
+    const noDataMsg = container.querySelector('.no-data-message-pie');
     if (noDataMsg) {
         noDataMsg.remove();
     }
     
-        if (canvas) {
+    if (canvas) {
         canvas.style.display = 'block';
     } else {
-                const newCanvas = document.createElement('canvas');
+        const newCanvas = document.createElement('canvas');
         newCanvas.id = 'spendingPieChart';
         container.appendChild(newCanvas);
     }
     
-        const ctx = document.getElementById('spendingPieChart').getContext('2d');
+    const ctx = document.getElementById('spendingPieChart').getContext('2d');
     
-        const categories = Object.entries(data.spendingByCategory)
+    const categories = Object.entries(data.spendingByCategory)
         .map(([category, info]) => ({
             label: category,
             amount: info.amount,
@@ -4399,7 +4468,7 @@ function updateSpendingPieChart(data) {
     const amounts = categories.map(c => c.amount);
     const colors = generateColors(categories.length);
     
-        if (analysisCharts.spendingPie) {
+    if (analysisCharts.spendingPie) {
         analysisCharts.spendingPie.data.labels = labels;
         analysisCharts.spendingPie.data.datasets[0].data = amounts;
         analysisCharts.spendingPie.data.datasets[0].backgroundColor = colors;
@@ -4423,7 +4492,8 @@ function updateSpendingPieChart(data) {
                     legend: {
                         position: 'right',
                         labels: {
-                            color: '#ffffff',                              font: {
+                            color: '#ffffff',  
+                            font: {
                                 size: 10
                             },
                             padding: 10
@@ -4449,7 +4519,7 @@ function updateSpendingPieChart(data) {
    function updateIncomeExpenseChart(data) {
     console.log('📈 updateIncomeExpenseChart() called');
     
-        const container = document.getElementById('incomeExpenseChart')?.parentElement;
+    const container = document.getElementById('incomeExpenseChart')?.parentElement;
     const canvas = document.getElementById('incomeExpenseChart');
     
     console.log('🔍 DOM Elements:', {
@@ -4464,7 +4534,7 @@ function updateSpendingPieChart(data) {
         return;
     }
     
-        const trends = data.monthlyTrends;
+    const trends = data.monthlyTrends;
     
     console.log('📊 Trends data check:', {
         totalTrends: trends.length,
@@ -4474,46 +4544,48 @@ function updateSpendingPieChart(data) {
         sampleData: trends.slice(0, 2)
     });
     
-        const hasData = trends.length > 0 && 
+    const hasData = trends.length > 0 && 
                    trends.some(t => t.income > 0 || t.expense > 0);
     
     console.log('✅ Has data for chart?', hasData);
     
-        if (!hasData) {
+    if (!hasData) {
         console.log('⚠️ No data for incomeExpenseChart - HIDING canvas');
         
-                if (canvas) {
+        if (canvas) {
             canvas.style.display = 'none';
             console.log('👁️ Canvas hidden');
         }
         
-                const existingMessage = container.querySelector('.no-data-message');
+        const existingMessage = container.querySelector('.no-data-message');
         if (existingMessage) {
             console.log('📝 Existing no-data message found');
-            return;         }
+            return; 
+        }
         
-                console.log('✏️ Creating no-data message');
+        console.log('✏️ Creating no-data message');
         const message = document.createElement('div');
         message.className = 'no-data-message h-64 flex items-center justify-center text-slate-400 text-sm italic';
         message.textContent = 'ไม่มีข้อมูลแนวโน้ม';
         
-                container.appendChild(message);
+        container.appendChild(message);
         
-        return;     }
+        return; 
+    }
     
-        console.log('🎯 Has data, showing chart...');
+    console.log('🎯 Has data, showing chart...');
     
-        const noDataMsg = container.querySelector('.no-data-message');
+    const noDataMsg = container.querySelector('.no-data-message');
     if (noDataMsg) {
         console.log('🗑️ Removing no-data message');
         noDataMsg.remove();
     }
     
-        if (canvas) {
+    if (canvas) {
         canvas.style.display = 'block';
         console.log('👁️ Canvas shown');
     } else {
-                console.log('🔄 Canvas not found, creating new one');
+        console.log('🔄 Canvas not found, creating new one');
         const newCanvas = document.createElement('canvas');
         newCanvas.id = 'incomeExpenseChart';
         newCanvas.style.display = 'block';
@@ -4521,13 +4593,13 @@ function updateSpendingPieChart(data) {
         console.log('✅ New canvas created');
     }
     
-        const ctx = document.getElementById('incomeExpenseChart').getContext('2d');
+    const ctx = document.getElementById('incomeExpenseChart').getContext('2d');
     if (!ctx) {
         console.error('❌ Cannot get canvas context');
         return;
     }
     
-        const labels = trends.map(t => t.month);
+    const labels = trends.map(t => t.month);
     const incomeData = trends.map(t => t.income);
     const expenseData = trends.map(t => t.expense);
     
@@ -4537,17 +4609,18 @@ function updateSpendingPieChart(data) {
         expenseData: expenseData
     });
     
-        if (analysisCharts.incomeExpense) {
+    if (analysisCharts.incomeExpense) {
         console.log('↻ Updating existing chart');
         
         try {
             analysisCharts.incomeExpense.data.labels = labels;
             analysisCharts.incomeExpense.data.datasets[0].data = incomeData;
             analysisCharts.incomeExpense.data.datasets[1].data = expenseData;
-            analysisCharts.incomeExpense.update('none');             console.log('✅ Chart updated');
+            analysisCharts.incomeExpense.update('none'); 
+            console.log('✅ Chart updated');
         } catch (updateError) {
             console.error('❌ Chart update failed:', updateError);
-                        analysisCharts.incomeExpense.destroy();
+            analysisCharts.incomeExpense.destroy();
             analysisCharts.incomeExpense = null;
             createNewChart(ctx, labels, incomeData, expenseData);
         }
@@ -4556,7 +4629,7 @@ function updateSpendingPieChart(data) {
         createNewChart(ctx, labels, incomeData, expenseData);
     }
     
-        function createNewChart(context, labels, incomeData, expenseData) {
+    function createNewChart(context, labels, incomeData, expenseData) {
         try {
             analysisCharts.incomeExpense = new Chart(context, {
                 type: 'line',
@@ -4587,7 +4660,8 @@ function updateSpendingPieChart(data) {
                     responsive: true,
                     maintainAspectRatio: false,
                     animation: {
-                        duration: 0                     },
+                        duration: 0 
+                    },
                     plugins: {
                         legend: {
                             position: 'top',
@@ -4654,7 +4728,8 @@ function updateSpendingPieChart(data) {
                     },
                     elements: {
                         point: {
-                            radius: 0,                             hoverRadius: 4
+                            radius: 0, 
+                            hoverRadius: 4
                         }
                     }
                 }
@@ -4680,7 +4755,8 @@ function updateSpendingPieChart(data) {
             
             container.innerHTML = data.topCategories.map((cat, index) => {
                 const percentage = totalExpense > 0 ? (cat.amount / totalExpense) * 100 : 0;
-                const width = Math.min(percentage * 2, 100);                 
+                const width = Math.min(percentage * 2, 100); 
+                
                 return `
                 <div class="space-y-1">
                     <div class="flex justify-between items-center">
@@ -4711,21 +4787,21 @@ function updateCategoryComparisonChart(data) {
         return;
     }
     
-        const hasData = data.topCategories.length > 0;
+    const hasData = data.topCategories.length > 0;
     
     if (!hasData) {
         console.log('⚠️ No data for category comparison chart - HIDING canvas');
         
-                if (canvas) {
+        if (canvas) {
             canvas.style.display = 'none';
         }
         
-                const existingMessage = container.querySelector('.no-data-message-category');
+        const existingMessage = container.querySelector('.no-data-message-category');
         if (existingMessage) {
             return;
         }
         
-                const message = document.createElement('div');
+        const message = document.createElement('div');
         message.className = 'no-data-message-category h-64 flex items-center justify-center text-slate-400 text-sm italic';
         message.textContent = 'ไม่มีข้อมูลหมวดหมู่';
         container.appendChild(message);
@@ -4733,14 +4809,14 @@ function updateCategoryComparisonChart(data) {
         return;
     }
     
-        console.log('✅ Has data for category comparison chart');
+    console.log('✅ Has data for category comparison chart');
     
-        const noDataMsg = container.querySelector('.no-data-message-category');
+    const noDataMsg = container.querySelector('.no-data-message-category');
     if (noDataMsg) {
         noDataMsg.remove();
     }
     
-        if (canvas) {
+    if (canvas) {
         canvas.style.display = 'block';
     } else {
         const newCanvas = document.createElement('canvas');
@@ -4748,14 +4824,14 @@ function updateCategoryComparisonChart(data) {
         container.appendChild(newCanvas);
     }
     
-        const ctx = document.getElementById('categoryComparisonChart').getContext('2d');
+    const ctx = document.getElementById('categoryComparisonChart').getContext('2d');
     
-        const top5 = data.topCategories.slice(0, 5);
+    const top5 = data.topCategories.slice(0, 5);
     const labels = top5.map(c => c.category);
     const amounts = top5.map(c => c.amount);
     const colors = generateColors(top5.length);
     
-        if (analysisCharts.categoryComparison) {
+    if (analysisCharts.categoryComparison) {
         analysisCharts.categoryComparison.data.labels = labels;
         analysisCharts.categoryComparison.data.datasets[0].data = amounts;
         analysisCharts.categoryComparison.data.datasets[0].backgroundColor = colors;
@@ -4785,7 +4861,8 @@ function updateCategoryComparisonChart(data) {
                     y: {
                         beginAtZero: true,
                         ticks: {
-                            color: '#ffffff',                              callback: function(value) {
+                            color: '#ffffff',  
+                            callback: function(value) {
                                 if (value >= 1000) {
                                     return '฿' + (value / 1000).toFixed(0) + 'k';
                                 }
@@ -4795,7 +4872,8 @@ function updateCategoryComparisonChart(data) {
                     },
                     x: {
                         ticks: {
-                            color: '#ffffff'                          }
+                            color: '#ffffff' 
+                        }
                     }
                 }
             }
@@ -4821,16 +4899,16 @@ function updateIncomeTrendChart(data) {
     if (!hasData) {
         console.log('⚠️ No data for incomeTrendChart - HIDING canvas');
         
-                if (canvas) {
+        if (canvas) {
             canvas.style.display = 'none';
         }
         
-                const existingMessage = container.querySelector('.no-data-message-income-trend');
+        const existingMessage = container.querySelector('.no-data-message-income-trend');
         if (existingMessage) {
             return;
         }
         
-                const message = document.createElement('div');
+        const message = document.createElement('div');
         message.className = 'no-data-message-income-trend h-64 flex items-center justify-center text-slate-400 text-sm italic';
         message.textContent = 'ไม่มีข้อมูลแนวโน้มรายได้';
         container.appendChild(message);
@@ -4838,14 +4916,14 @@ function updateIncomeTrendChart(data) {
         return;
     }
     
-        console.log('✅ Has data for income trend chart');
+    console.log('✅ Has data for income trend chart');
     
-        const noDataMsg = container.querySelector('.no-data-message-income-trend');
+    const noDataMsg = container.querySelector('.no-data-message-income-trend');
     if (noDataMsg) {
         noDataMsg.remove();
     }
     
-        if (canvas) {
+    if (canvas) {
         canvas.style.display = 'block';
     } else {
         const newCanvas = document.createElement('canvas');
@@ -4853,12 +4931,12 @@ function updateIncomeTrendChart(data) {
         container.appendChild(newCanvas);
     }
     
-        const ctx = document.getElementById('incomeTrendChart').getContext('2d');
+    const ctx = document.getElementById('incomeTrendChart').getContext('2d');
     
-        const labels = trends.map(t => t.month);
+    const labels = trends.map(t => t.month);
     const incomeData = trends.map(t => t.income);
     
-        if (analysisCharts.incomeTrend) {
+    if (analysisCharts.incomeTrend) {
         analysisCharts.incomeTrend.data.labels = labels;
         analysisCharts.incomeTrend.data.datasets[0].data = incomeData;
         analysisCharts.incomeTrend.update();
@@ -4888,7 +4966,8 @@ function updateIncomeTrendChart(data) {
                             y: {
                                 beginAtZero: true,
                                 ticks: {
-                                    color: '#ffffff',                                      callback: function(value) {
+                                    color: '#ffffff',  
+                                    callback: function(value) {
                                         if (value >= 1000) {
                                             return '฿' + (value / 1000).toFixed(0) + 'k';
                                         }
@@ -4898,7 +4977,8 @@ function updateIncomeTrendChart(data) {
                             },
                             x: {
                             ticks: {
-                                color: '#ffffff'                                  }
+                                color: '#ffffff'  
+                                }
                             }
                         }
                     }
@@ -4923,16 +5003,16 @@ function updateExpenseTrendChart(data) {
     if (!hasData) {
         console.log('⚠️ No data for expenseTrendChart - HIDING canvas');
         
-                if (canvas) {
+        if (canvas) {
             canvas.style.display = 'none';
         }
         
-                const existingMessage = container.querySelector('.no-data-message-expense-trend');
+        const existingMessage = container.querySelector('.no-data-message-expense-trend');
         if (existingMessage) {
             return;
         }
         
-                const message = document.createElement('div');
+        const message = document.createElement('div');
         message.className = 'no-data-message-expense-trend h-64 flex items-center justify-center text-slate-400 text-sm italic';
         message.textContent = 'ไม่มีข้อมูลแนวโน้มรายจ่าย';
         container.appendChild(message);
@@ -4940,14 +5020,14 @@ function updateExpenseTrendChart(data) {
         return;
     }
     
-        console.log('✅ Has data for expense trend chart');
+    console.log('✅ Has data for expense trend chart');
     
-        const noDataMsg = container.querySelector('.no-data-message-expense-trend');
+    const noDataMsg = container.querySelector('.no-data-message-expense-trend');
     if (noDataMsg) {
         noDataMsg.remove();
     }
     
-        if (canvas) {
+    if (canvas) {
         canvas.style.display = 'block';
     } else {
         const newCanvas = document.createElement('canvas');
@@ -4955,12 +5035,12 @@ function updateExpenseTrendChart(data) {
         container.appendChild(newCanvas);
     }
     
-        const ctx = document.getElementById('expenseTrendChart').getContext('2d');
+    const ctx = document.getElementById('expenseTrendChart').getContext('2d');
     
-        const labels = trends.map(t => t.month);
+    const labels = trends.map(t => t.month);
     const expenseData = trends.map(t => t.expense);
     
-        if (analysisCharts.expenseTrend) {
+    if (analysisCharts.expenseTrend) {
         analysisCharts.expenseTrend.data.labels = labels;
         analysisCharts.expenseTrend.data.datasets[0].data = expenseData;
         analysisCharts.expenseTrend.update();
@@ -4990,7 +5070,8 @@ function updateExpenseTrendChart(data) {
                             y: {
                                 beginAtZero: true,
                                 ticks: {
-                                    color: '#ffffff',                                      callback: function(value) {
+                                    color: '#ffffff',  
+                                    callback: function(value) {
                                         if (value >= 1000) {
                                             return '฿' + (value / 1000).toFixed(0) + 'k';
                                         }
@@ -5000,7 +5081,8 @@ function updateExpenseTrendChart(data) {
                             },
                              x: {
                                 ticks: {
-                                    color: '#ffffff'                                  }
+                                    color: '#ffffff'  
+                                }
                             }
                         }
                     }
@@ -5044,13 +5126,13 @@ function calculate3MonthAverage(monthIndex) {
     let totalExpense = 0;
     let monthCount = 0;
     
-        for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 3; i++) {
         const targetMonth = monthIndex - i;
         const year = currentYear;
         let actualMonth = targetMonth;
         let actualYear = year;
         
-                if (actualMonth < 0) {
+        if (actualMonth < 0) {
             actualMonth += 12;
             actualYear -= 1;
         }
@@ -5079,32 +5161,33 @@ function calculate3MonthAverage(monthIndex) {
 
         function updateInsights(data) {
             const container = document.getElementById('insightsContainer');
-        if (!data) {
+    if (!data) {
         container.innerHTML = '<div class="p-8 text-center text-slate-400 italic text-sm">ไม่มีข้อมูลสำหรับการวิเคราะห์</div>';
         return;
     }
     
-        if (!data.expense || data.expense.length === 0) {
+    if (!data.expense || data.expense.length === 0) {
         container.innerHTML = '<div class="p-8 text-center text-slate-400 italic text-sm">ไม่มีข้อมูลรายจ่ายสำหรับการวิเคราะห์</div>';
         return;
     }
 
             const insights = [];
-        const tagInsights = updateTagInsights(data);
+    const tagInsights = updateTagInsights(data);
     insights.push(...tagInsights);
             
-                     const currentMonth = analysisDate.getMonth();
+    
+    const currentMonth = analysisDate.getMonth();
     const currentYear = analysisDate.getFullYear();
     let last3MonthsExpense = 0;
     let monthCount = 0;
     
-        for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 3; i++) {
         const month = currentMonth - i;
         const year = currentYear;
         let actualMonth = month;
         let actualYear = year;
         
-                if (actualMonth < 0) {
+        if (actualMonth < 0) {
             actualMonth += 12;
             actualYear -= 1;
         }
@@ -5120,12 +5203,12 @@ function calculate3MonthAverage(monthIndex) {
         }
     }
     
-        const avgExpenseLast3Months = monthCount > 0 ? last3MonthsExpense / monthCount : 0;
+    const avgExpenseLast3Months = monthCount > 0 ? last3MonthsExpense / monthCount : 0;
     
     if (avgExpenseLast3Months > 0 && monthCount >= 2) {
         const comparison = ((data.totalExpense - avgExpenseLast3Months) / avgExpenseLast3Months) * 100;
         
-                if (Math.abs(comparison) >= 10) {
+        if (Math.abs(comparison) >= 10) {
             const direction = comparison > 0 ? 'เพิ่มขึ้น' : 'ลดลง';
             const type = comparison > 30 ? 'warning' : (comparison > 15 ? 'info' : 'info');
             
@@ -5137,9 +5220,9 @@ function calculate3MonthAverage(monthIndex) {
             });
         }
     }
-    
 
-                        if (data.topCategories.length > 0) {
+
+            if (data.topCategories.length > 0) {
                 const topCat = data.topCategories[0];
                 const percentage = (topCat.amount / data.totalExpense) * 100;
                 insights.push({
@@ -5150,7 +5233,8 @@ function calculate3MonthAverage(monthIndex) {
                 });
             }
             
-            const investmentRate = data.savingRate; 
+const investmentRate = data.savingRate; 
+
 if (investmentRate >= 20) {
     insights.push({
         icon: '📈',
@@ -5174,7 +5258,7 @@ if (investmentRate >= 20) {
     });
 }
             
-                        if (data.avgExpensePerDay > data.avgIncomePerDay * 0.8) {
+            if (data.avgExpensePerDay > data.avgIncomePerDay * 0.8) {
                 insights.push({
                     icon: '⚡',
                     title: 'ค่าใช้จ่ายต่อวันสูง',
@@ -5183,7 +5267,7 @@ if (investmentRate >= 20) {
                 });
             }
             
-                        if (data.transactionsPerDay < 0.5) {
+            if (data.transactionsPerDay < 0.5) {
                 insights.push({
                     icon: '📝',
                     title: 'ความถี่ในการบันทึกต่ำ',
@@ -5192,7 +5276,7 @@ if (investmentRate >= 20) {
                 });
             }
             
-            let maxSpendingDay = {amount: 0, day: 'ไม่มีข้อมูล'};
+let maxSpendingDay = {amount: 0, day: 'ไม่มีข้อมูล'};
 if (data.spendingByDayOfWeek && data.spendingByDayOfWeek.length > 0) {
     maxSpendingDay = data.spendingByDayOfWeek.reduce((max, day) => 
         day.amount > max.amount ? day : max, {amount: 0});
@@ -5238,7 +5322,7 @@ if (maxSpendingDay.amount > 0) {
             type: healthType
         });
     }
-                if (insights.length === 0) {
+            if (insights.length === 0) {
                 container.innerHTML = '<div class="p-8 text-center text-slate-400 italic text-sm">ไม่มีข้อมูลเชิงลึก</div>';
                 return;
             }
@@ -5275,7 +5359,7 @@ if (maxSpendingDay.amount > 0) {
             const container = document.getElementById('recommendationsContainer');
             const recommendations = [];
             
-                        if (data.savingRate < 20 && data.savingRate > 0) {
+            if (data.savingRate < 20 && data.savingRate > 0) {
                 recommendations.push({
                     icon: '🎯',
                     title: 'เพิ่มอัตราการออมการลงทุน',
@@ -5311,7 +5395,7 @@ if (maxSpendingDay.amount > 0) {
                 });
             }
             
-                        if (data.filtered.length < 10) {
+            if (data.filtered.length < 10) {
                 recommendations.push({
                     icon: '📝',
                     title: 'บันทึกรายการให้มากขึ้น',
@@ -5323,7 +5407,7 @@ if (maxSpendingDay.amount > 0) {
     const healthScore = healthData.score;
 
     if (healthScore > 0 && healthScore < 80) {
-                if (healthData.components.saving < 30) {
+        if (healthData.components.saving < 30) {
             recommendations.push({
                 icon: '💰',
                 title: 'เพิ่มการออมการลงทุน',
@@ -5347,7 +5431,7 @@ if (maxSpendingDay.amount > 0) {
             });
         }
     }
-                        if (recommendations.length === 0) {
+            if (recommendations.length === 0) {
                 recommendations.push({
                     icon: '✅',
                     title: 'การเงินอยู่ในเกณฑ์ดี',
@@ -5371,7 +5455,7 @@ if (maxSpendingDay.amount > 0) {
 function updateSummaryInsights(data) {
     const container = document.getElementById('summaryInsights');
     
-        if (!data || !data.filtered) {
+    if (!data || !data.filtered) {
         container.innerHTML = `
             <div class="grid grid-cols-2 gap-3">
                 <div class="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl text-center">
@@ -5397,13 +5481,13 @@ function updateSummaryInsights(data) {
         return;
     }
     
-        const summary = {
+    const summary = {
         totalTransactions: data.filtered?.length || 0,
         incomeTransactions: data.income?.length || 0,
         expenseTransactions: data.expense?.length || 0,
         avgTransactionAmount: (data.filtered?.length || 0) > 0 ? 
             ((data.totalIncome || 0) + (data.totalExpense || 0)) / data.filtered.length : 0,
-                mostActiveDay: (data.spendingByDayOfWeek && data.spendingByDayOfWeek.length > 0) 
+        mostActiveDay: (data.spendingByDayOfWeek && data.spendingByDayOfWeek.length > 0) 
             ? data.spendingByDayOfWeek.reduce((max, day) => 
                 day.count > max.count ? day : max, {count: 0, day: 'ไม่มีข้อมูล'}).day 
             : 'ไม่มีข้อมูล'
@@ -5443,12 +5527,12 @@ function ensureChartContainer(chartId) {
             
             console.log(`🔧 Checking container for ${chartId}`);
             
-                        if (!canvas || !container.contains(canvas)) {
+            if (!canvas || !container.contains(canvas)) {
                 console.log(`🔄 Recreating canvas for ${chartId}`);
                 
-                                container.innerHTML = '';
+                container.innerHTML = '';
                 
-                                const newCanvas = document.createElement('canvas');
+                const newCanvas = document.createElement('canvas');
                 newCanvas.id = chartId;
                 newCanvas.style.display = 'block';
                 container.appendChild(newCanvas);
@@ -5466,7 +5550,7 @@ function ensureChartContainer(chartId) {
                 '#14b8a6', '#f43f5e', '#0ea5e9', '#22c55e', '#eab308'
             ];
             
-                        const result = [];
+            const result = [];
             for (let i = 0; i < count; i++) {
                 result.push(colors[i % colors.length]);
             }
@@ -5474,10 +5558,10 @@ function ensureChartContainer(chartId) {
             return result;
         }
 
-        function refreshAnalysisCharts() {
+function refreshAnalysisCharts() {
     console.log("🔄 refreshAnalysisCharts START");
     
-        if (!document.getElementById('page-analysis').classList.contains('hidden')) {
+    if (!document.getElementById('page-analysis').classList.contains('hidden')) {
         try {
             const data = getAnalysisData();
             updateAnalysisStats(data);
@@ -5492,7 +5576,7 @@ function ensureChartContainer(chartId) {
             
             const tabId = activeTab.id.replace('a-tab-', '');
             
-                        switch(tabId) {
+            switch(tabId) {
                 case 'overview':
                     updateSpendingPieChart(data);
                     updateTagPieChart();
@@ -5504,7 +5588,8 @@ function ensureChartContainer(chartId) {
                     updateCategoryComparisonChart(data);
                     break;
                     
-                case 'tags':                      updateTagAnalysisUI();
+                case 'tags':  
+                    updateTagAnalysisUI();
                     break;
                     
                 case 'trends':
@@ -5527,22 +5612,22 @@ function ensureChartContainer(chartId) {
     
     console.log("✅ refreshAnalysisCharts END");
 }
-        function switchAnalysisTab(tab) {
-        document.querySelectorAll('.analysis-tab-btn').forEach(btn => {
+function switchAnalysisTab(tab) {
+    document.querySelectorAll('.analysis-tab-btn').forEach(btn => {
         btn.classList.remove('active');
     });
     document.getElementById(`a-tab-${tab}`).classList.add('active');
     
-        document.querySelectorAll('[id^="a-content-"]').forEach(el => {
+    document.querySelectorAll('[id^="a-content-"]').forEach(el => {
         el.classList.add('hidden');
     });
     
-        document.getElementById(`a-content-${tab}`).classList.remove('hidden');
+    document.getElementById(`a-content-${tab}`).classList.remove('hidden');
     
-        if (document.getElementById('page-analysis') && 
+    if (document.getElementById('page-analysis') && 
         !document.getElementById('page-analysis').classList.contains('hidden')) {
         refreshAnalysisCharts();
-                
+
     }
 }
 
@@ -5559,12 +5644,12 @@ function changeAnalysisPeriod(step) {
             break;
     }
     
-        const activeTab = document.querySelector('.analysis-tab-btn.active');
+    const activeTab = document.querySelector('.analysis-tab-btn.active');
     if (activeTab) {
         const tabId = activeTab.id.replace('a-tab-', '');
         
         if (tabId === 'tags') {
-                        updateTagAnalysisUI();
+            updateTagAnalysisUI();
         } else {
             updateAnalysisUI();
         }
@@ -5585,35 +5670,41 @@ function changeDebtPeriod(step) {
             debtDate.setFullYear(debtDate.getFullYear() + step);
             break;
         case 'all':
-                        break;
+            break;
     }
     
     updateDebtPeriodText();
-    renderDebtPage(); }
+    renderDebtPage(); 
+}
 
 function changeAnalysisPeriodType() {
             const select = document.getElementById('analysisPeriodSelect');
             analysisPeriod = select.value;
-            analysisDate = new Date();             updateAnalysisUI();
+            analysisDate = new Date(); 
+            updateAnalysisUI();
         }
 
 
 
-        function updateYearlyUI() {
+function updateYearlyUI() {
     document.getElementById('displayYearText').innerText = displayYear;
     
-        const inc = Array(12).fill(0);      const inv = Array(12).fill(0);      const spd = Array(12).fill(0);      
-        const incomeByCategory = {};
+    const inc = Array(12).fill(0);  
+    const inv = Array(12).fill(0);  
+    const spd = Array(12).fill(0); 
+    
+    const incomeByCategory = {};
     customCategories.income.forEach(cat => {
         incomeByCategory[cat.label] = Array(12).fill(0);
     });
     
-        const dCat = {};
+    const dCat = {};
     [...customCategories.spending, ...customCategories.investment].forEach(c => dCat[c.label] = Array(12).fill(0));
     
-        const filteredTransactions = accountFilterId !== 'all' 
+    const filteredTransactions = accountFilterId !== 'all' 
         ? transactions.filter(t => 
-            t.accountId === accountFilterId ||              (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
+            t.accountId === accountFilterId ||  
+            (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
           )
         : transactions;
     
@@ -5640,7 +5731,9 @@ function changeAnalysisPeriodType() {
         } 
     });
     
-        const mSumSpending = Array(12).fill(0);      const mSumInvestment = Array(12).fill(0);     
+    const mSumSpending = Array(12).fill(0);  
+    const mSumInvestment = Array(12).fill(0); 
+    
     customCategories.spending.forEach(c => {
         if (dCat[c.label]) {
             dCat[c.label].forEach((v, i) => mSumSpending[i] += v);
@@ -5664,15 +5757,16 @@ function changeAnalysisPeriodType() {
     
     let html = '';
     
-        customCategories.spending.forEach(c => {
+    customCategories.spending.forEach(c => {
         const mV = dCat[c.label] || Array(12).fill(0); 
         const rowTotal = mV.reduce((a,b)=>a+b,0);
-        if (rowTotal > 0) {             html += `<tr>
+        if (rowTotal > 0) { 
+            html += `<tr>
                 <td class="px-4 py-3 font-bold sticky left-0 z-10 bg-white dark:bg-slate-900 dark:text-white border-r border-slate-100 dark:border-slate-800">
                     ${c.icon} ${c.label}
                 </td>`;
                 
-                        mV.forEach((v, monthIdx) => {
+            mV.forEach((v, monthIdx) => {
                 if (v > 0) {
                     html += `<td onclick="openYearlyCategoryModal('${c.label}', ${monthIdx}, ${displayYear})" 
                                class="px-3 py-3 text-center text-slate-500 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors relative group">
@@ -5690,7 +5784,7 @@ function changeAnalysisPeriodType() {
         }
     });
     
-        html += `<tr class="font-bold bg-rose-900/10">
+    html += `<tr class="font-bold bg-rose-900/10">
         <td class="px-4 py-3 sticky left-0 z-10 bg-slate-800 text-rose-400">รวมรายจ่าย</td>`;
         
     mSumSpending.forEach((s, monthIdx) => {
@@ -5707,17 +5801,18 @@ function changeAnalysisPeriodType() {
         <td class="px-4 py-3 text-right text-rose-300">฿${(tSumSpending/12).toLocaleString(undefined,{maximumFractionDigits:0})}</td>
     </tr>`;
     
-        html += `<tr class="bg-slate-800/30"><td colspan="15" class="py-1"></td></tr>`;
+    html += `<tr class="bg-slate-800/30"><td colspan="15" class="py-1"></td></tr>`;
     
-        customCategories.investment.forEach(c => {
+    customCategories.investment.forEach(c => {
         const mV = dCat[c.label] || Array(12).fill(0); 
         const rowTotal = mV.reduce((a,b)=>a+b,0);
-        if (rowTotal > 0) {             html += `<tr>
+        if (rowTotal > 0) { 
+            html += `<tr>
                 <td class="px-4 py-3 font-bold sticky left-0 z-10 bg-white dark:bg-slate-900 dark:text-white border-r border-slate-100 dark:border-slate-800">
                     ${c.icon} ${c.label}
                 </td>`;
                 
-                        mV.forEach((v, monthIdx) => {
+            mV.forEach((v, monthIdx) => {
                 if (v > 0) {
                     html += `<td onclick="openYearlyCategoryModal('${c.label}', ${monthIdx}, ${displayYear})" 
                                class="px-3 py-3 text-center text-slate-500 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors relative group">
@@ -5735,7 +5830,7 @@ function changeAnalysisPeriodType() {
         }
     });
     
-        html += `<tr class="font-bold bg-amber-900/10">
+    html += `<tr class="font-bold bg-amber-900/10">
         <td class="px-4 py-3 sticky left-0 z-10 bg-slate-800 text-amber-400">รวมลงทุน</td>`;
         
     mSumInvestment.forEach((s, monthIdx) => {
@@ -5752,17 +5847,18 @@ function changeAnalysisPeriodType() {
         <td class="px-4 py-3 text-right text-amber-300">฿${(tSumInvestment/12).toLocaleString(undefined,{maximumFractionDigits:0})}</td>
     </tr>`;
     
-        html += `<tr class="bg-slate-800/30"><td colspan="15" class="py-1"></td></tr>`;
+    html += `<tr class="bg-slate-800/30"><td colspan="15" class="py-1"></td></tr>`;
     
-        customCategories.income.forEach(cat => {
+    customCategories.income.forEach(cat => {
         const monthlyValues = incomeByCategory[cat.label] || Array(12).fill(0);
         const rowTotal = monthlyValues.reduce((a, b) => a + b, 0);
-        if (rowTotal > 0) {             html += `<tr>
+        if (rowTotal > 0) { 
+            html += `<tr>
                 <td class="px-4 py-3 font-bold sticky left-0 z-10 bg-white dark:bg-slate-900 dark:text-white border-r border-slate-100 dark:border-slate-800">
                     ${cat.icon} ${cat.label}
                 </td>`;
                 
-                        monthlyValues.forEach((v, monthIdx) => {
+            monthlyValues.forEach((v, monthIdx) => {
                 if (v > 0) {
                     html += `<td onclick="openYearlyCategoryModal('${cat.label}', ${monthIdx}, ${displayYear})" 
                                class="px-3 py-3 text-center text-slate-500 cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors relative group">
@@ -5780,7 +5876,7 @@ function changeAnalysisPeriodType() {
         }
     });
     
-        html += `<tr class="font-bold bg-emerald-900/10">
+    html += `<tr class="font-bold bg-emerald-900/10">
         <td class="px-4 py-3 sticky left-0 z-10 bg-slate-800 text-emerald-400">รวมรายรับ</td>`;
         
     inc.forEach((s, monthIdx) => {
@@ -5797,9 +5893,9 @@ function changeAnalysisPeriodType() {
         <td class="px-4 py-3 text-right text-emerald-300">฿${(tSumInc/12).toLocaleString(undefined,{maximumFractionDigits:0})}</td>
     </tr>`;
     
-        html += `<tr class="bg-slate-800/30"><td colspan="15" class="py-1"></td></tr>`;
+    html += `<tr class="bg-slate-800/30"><td colspan="15" class="py-1"></td></tr>`;
     
-        html += `<tr class="font-bold bg-rose-900/10">
+    html += `<tr class="font-bold bg-rose-900/10">
         <td class="px-4 py-3 sticky left-0 z-10 bg-slate-800 text-rose-500">ใช้เกิน (ติดลบ)</td>
         ${mOver.map(s => `<td class="px-3 py-3 text-center text-rose-500">${s > 0 ? '-' + s.toLocaleString() : '-'}</td>`).join('')}
         <td class="px-4 py-3 text-right text-rose-600">฿${tOver > 0 ? '-' + tOver.toLocaleString() : '0'}</td>
@@ -5814,7 +5910,7 @@ function changeAnalysisPeriodType() {
     
     document.getElementById('yearlyDetailedBody').innerHTML = html;
     
-        if (yearlyChart) yearlyChart.destroy();
+    if (yearlyChart) yearlyChart.destroy();
     yearlyChart = new Chart(document.getElementById('yearlyChart').getContext('2d'), {
         type: 'bar', 
         data: { 
@@ -5849,18 +5945,19 @@ function changeAnalysisPeriodType() {
 function updateYearlyTagsUI() {
     const tagData = {};
     
-    const filteredTransactions = accountFilterId !== 'all' 
+const filteredTransactions = accountFilterId !== 'all' 
         ? transactions.filter(t => 
-            t.accountId === accountFilterId ||              (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
+            t.accountId === accountFilterId ||  
+            (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
           )
         : transactions;
     
-    filteredTransactions.forEach(t => {
+filteredTransactions.forEach(t => {
     const parts = t.monthKey.split('-');
     const y = parseInt(parts[0]);
     const m = parseInt(parts[1]);
     
-        if (y === displayYear && t.tag && t.tag.trim() !== '') {
+    if (y === displayYear && t.tag && t.tag.trim() !== '') {
         const tag = t.tag.trim();
         if (!tagData[tag]) tagData[tag] = Array(12).fill(0);
         tagData[tag][m-1] += t.amount;
@@ -5884,19 +5981,25 @@ function switchYearlyTab(tabId) {
     document.getElementById('y-content-tags').classList.toggle('hidden', tabId !== 'tags');
     
     if (tabId === 'tags') {
-        updateYearlyTagsUI();     } else if (tabId === 'category') {
-        updateYearlyUI();     }
+        updateYearlyTagsUI(); 
+    } else if (tabId === 'category') {
+        updateYearlyUI(); 
+    }
 }
 
 
-        let debts = JSON.parse(localStorage.getItem('fin_debts')) || [];
+
+let debts = JSON.parse(localStorage.getItem('fin_debts')) || [];
 let payments = JSON.parse(localStorage.getItem('fin_debt_payments')) || [];
 let tags = JSON.parse(localStorage.getItem('fin_tags')) || [];  
 
 
+
 function renderDebtPage() {
     console.log('renderDebtPage called');
-    console.log('debts array:', debts);     console.log('debts count:', debts.length);     
+    console.log('debts array:', debts);
+    console.log('debts count:', debts.length); 
+    
     updateDebtSummary();
     switchDebtTab(currentDebtTab);
 }
@@ -5922,7 +6025,7 @@ async function saveDebtPaymentToBackend(paymentData) {
         const result = await response.json();
         
         if (response.ok && result.id && paymentData.id.startsWith('payment_')) {
-                        const index = payments.findIndex(p => p.id === paymentData.id);
+            const index = payments.findIndex(p => p.id === paymentData.id);
             if (index !== -1) {
                 payments[index].id = result.id.toString();
                 payments[index].backendId = result.id;
@@ -5982,7 +6085,8 @@ async function deleteDebtPaymentFromBackend(paymentId) {
 }
 
 function switchDebtTab(tab) {
-    currentDebtTab = tab;         const activeBtn = document.getElementById('debtTabActive');
+    currentDebtTab = tab; 
+    const activeBtn = document.getElementById('debtTabActive');
     const closedBtn = document.getElementById('debtTabClosed');
     
     if (tab === 'active') {
@@ -6003,24 +6107,24 @@ function switchDebtTab(tab) {
         renderClosedDebtsList();
     }
     
-        updateDebtSummary();
+    updateDebtSummary();
     renderPaymentHistory();
 }
 
 function updateDebtSummary() {
-        const currentTab = document.getElementById('debtTabActive').classList.contains('border-indigo-600') ? 'active' : 'closed';
+    const currentTab = document.getElementById('debtTabActive').classList.contains('border-indigo-600') ? 'active' : 'closed';
     
     let totalDebt = 0;
     let totalPaid = 0;
     let debtCount = 0;
     
     debts.forEach(debt => {
-                if (currentTab === 'active' && debt.status !== 'open') return;
+        if (currentTab === 'active' && debt.status !== 'open') return;
         if (currentTab === 'closed' && debt.status !== 'closed') return;
         
         totalDebt += debt.totalAmount;
         
-                const debtPayments = payments.filter(p => p.debtId === debt.id);
+        const debtPayments = payments.filter(p => p.debtId === debt.id);
         const paidAmount = debtPayments.reduce((sum, p) => sum + p.amount, 0);
         totalPaid += paidAmount;
         debtCount++;
@@ -6028,12 +6132,12 @@ function updateDebtSummary() {
     
      const remaining = totalDebt - totalPaid;
     
-        document.getElementById('totalDebtAmount').textContent = `฿${totalDebt.toLocaleString()}`;
+    document.getElementById('totalDebtAmount').textContent = `฿${totalDebt.toLocaleString()}`;
     document.getElementById('totalPaidAmount').textContent = `฿${totalPaid.toLocaleString()}`;
     document.getElementById('remainingDebtAmount').textContent = `฿${remaining.toLocaleString()}`;
     document.getElementById('totalDebtCount').textContent = debtCount;
     
-        const activeDebtsCount = debts.filter(d => d.status === 'open').length;
+    const activeDebtsCount = debts.filter(d => d.status === 'open').length;
     const closedDebtsCount = debts.filter(d => d.status === 'closed').length;
     document.getElementById('activeDebtCount').textContent = activeDebtsCount;
     document.getElementById('closedDebtCount').textContent = closedDebtsCount;
@@ -6055,14 +6159,14 @@ function renderActiveDebtsList() {
         return;
     }
     
-    const activeDebts = debts.filter(d => d.status === 'open');
+const activeDebts = debts.filter(d => d.status === 'open');
 container.innerHTML = activeDebts.map(debt => {
         const debtPayments = payments.filter(p => p.debtId === debt.id);
         const paidAmount = debtPayments.reduce((sum, p) => sum + p.amount, 0);
         const remainingAmount = debt.totalAmount - paidAmount;
         const progress = (paidAmount / debt.totalAmount) * 100;
         
-                const icon = debt.categoryIcon || '📝';
+        const icon = debt.categoryIcon || '📝';
         const categoryLabel = debt.categoryName || 'ไม่ระบุหมวดหมู่';
         const tag = debt.tag ? `<span class="text-[10px] text-indigo-400">${debt.tag}</span>` : '';
         
@@ -6124,7 +6228,7 @@ container.innerHTML = activeDebts.map(debt => {
 function renderClosedDebtsList() {
     const container = document.getElementById('closedDebtsContainer');
     
-    
+
  const closedDebts = debts.filter(d => d.status === 'closed');
     
     if (closedDebts.length === 0) {
@@ -6139,11 +6243,11 @@ function renderClosedDebtsList() {
     }
     
     container.innerHTML = closedDebts.map(debt => {
-                const debtPayments = payments.filter(p => p.debtId === debt.id);
+        const debtPayments = payments.filter(p => p.debtId === debt.id);
         const paidAmount = debtPayments.reduce((sum, p) => sum + p.amount, 0);
         const progress = (paidAmount / debt.totalAmount) * 100;
         
-                const closedDate = debt.closedAt ? new Date(debt.closedAt).toLocaleDateString('th-TH') : 'ไม่ระบุ';
+        const closedDate = debt.closedAt ? new Date(debt.closedAt).toLocaleDateString('th-TH') : 'ไม่ระบุ';
         
         return `
         <div class="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 mb-2">
@@ -6202,10 +6306,10 @@ function deleteClosedDebt(debtId) {
         `ลบรายการหนี้ "${debt.name}" จากรายการที่ปิดแล้ว\n` +
         '📝 หมายเหตุ: การชำระเงินและ transaction ยังคงอยู่',
         () => {
-                        debts = debts.filter(d => d.id !== debtId);
+            debts = debts.filter(d => d.id !== debtId);
             saveDebtsToStorage();
             
-                        if (currentDebtTab === 'closed') {
+            if (currentDebtTab === 'closed') {
                 renderClosedDebtsList();
             }
             
@@ -6225,26 +6329,26 @@ function deleteActiveDebt(debtId) {
         `ลบหนี้ "${debt.name}" และ transaction ที่เกี่ยวข้องทั้งหมด\n` +
         '⚠️ ลบแล้วจะกู้คืนไม่ได้',
         async () => {
-                        if (isLoggedIn && navigator.onLine) {
+            if (isLoggedIn && navigator.onLine) {
                 await deleteDebtFromBackend(debtId);
             }
-                        
-                        debts = debts.filter(d => d.id !== debtId);
             
-                        const relatedPayments = payments.filter(p => p.debtId === debtId);
+            debts = debts.filter(d => d.id !== debtId);
+            
+            const relatedPayments = payments.filter(p => p.debtId === debtId);
             payments = payments.filter(p => p.debtId !== debtId);
             
-                        if (relatedPayments.length > 0) {
+            if (relatedPayments.length > 0) {
                 try {
                     const relatedExpenses = transactions.filter(t => 
                         t.isDebtPayment && t.originalDebtId === debtId
                     );
                     
-                                        for (const expense of relatedExpenses) {
+                    for (const expense of relatedExpenses) {
                         await financeDB.deleteTransaction(expense.id);
                     }
                     
-                                        transactions = transactions.filter(t => 
+                    transactions = transactions.filter(t => 
                         !(t.isDebtPayment && t.originalDebtId === debtId)
                     );
                 } catch (error) {
@@ -6255,7 +6359,7 @@ function deleteActiveDebt(debtId) {
             saveDebtsToStorage();
             savePaymentsToStorage();
             
-                        renderDebtPage();
+            renderDebtPage();
             updateUI();
             refreshAnalysisCharts();
             
@@ -6272,18 +6376,22 @@ function renderPaymentHistory() {
     const sortedPayments = [...payments]
         .filter(p => {
             const debt = debts.find(d => d.id === p.debtId);
-            return debt && debt.status === 'open';         })
+            return debt && debt.status === 'open'; 
+        })
         .sort((a, b) => {
-                        const dateA = new Date(a.date || a.createdAt || 0);
+            const dateA = new Date(a.date || a.createdAt || 0);
             const dateB = new Date(b.date || b.createdAt || 0);
             
-                        if (dateA.getTime() === dateB.getTime()) {
+            if (dateA.getTime() === dateB.getTime()) {
                 const timeA = new Date(a.createdAt || 0).getTime();
                 const timeB = new Date(b.createdAt || 0).getTime();
-                return timeB - timeA;             }
+                return timeB - timeA; 
+            }
             
-            return dateB - dateA;         })
-    .slice(0, 10);     
+            return dateB - dateA; 
+        })
+    .slice(0, 10); 
+    
     if (sortedPayments.length === 0) {
         container.innerHTML = '<p class="text-center text-slate-400 text-sm py-4">ยังไม่มีประวัติการชำระ</p>';
         return;
@@ -6333,7 +6441,7 @@ function openAddDebtModal() {
     document.getElementById('debtModalTitle').textContent = 'เพิ่มหนี้ใหม่';
     document.getElementById('saveDebtBtn').textContent = 'บันทึก';
     
-        const categorySelect = document.getElementById('debtCategorySelect');
+    const categorySelect = document.getElementById('debtCategorySelect');
     if (categorySelect) {
         categorySelect.innerHTML = `
             <option value="">-- เลือกหมวดหมู่ --</option>
@@ -6343,7 +6451,7 @@ function openAddDebtModal() {
         `;
     }
     
-        document.getElementById('debtNameInput').value = '';
+    document.getElementById('debtNameInput').value = '';
     document.getElementById('debtTagInput').value = 'ผ่อนหนี้';
     document.getElementById('debtTotalAmount').value = '';
     document.getElementById('debtMonthlyPayment').value = '';
@@ -6388,7 +6496,7 @@ function saveDebt() {
     const dueDate = parseInt(document.getElementById('debtDueDate').value);
     const startDate = document.getElementById('debtStartDate').value;
     
-        if (!name || !categoryId || !totalAmount || !monthlyPayment) {
+    if (!name || !categoryId || !totalAmount || !monthlyPayment) {
         showToast('กรุณากรอกข้อมูลให้ครบถ้วน');
         return;
     }
@@ -6398,7 +6506,7 @@ function saveDebt() {
         return;
     }
     
-        const spendingCat = customCategories.spending.find(c => c.id === categoryId);
+    const spendingCat = customCategories.spending.find(c => c.id === categoryId);
     if (!spendingCat) {
         showToast('ไม่พบหมวดหมู่ที่เลือก');
         return;
@@ -6416,7 +6524,10 @@ function saveDebt() {
     interestRate,
     dueDate,
     startDate,
-    status: 'open',     closedAt: null,      closingNote: '',     createdAt: new Date().toISOString(),
+    status: 'open', 
+    closedAt: null,  
+    closingNote: '', 
+    createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
 };
     
@@ -6426,14 +6537,14 @@ function saveDebt() {
             debts[index] = debtData;
         }
         
-                if (isLoggedIn && navigator.onLine) {
+        if (isLoggedIn && navigator.onLine) {
             updateDebtInBackend(debtData);
         }
         
     } else {
         debts.push(debtData);
         
-                if (isLoggedIn && navigator.onLine) {
+        if (isLoggedIn && navigator.onLine) {
             saveDebtToBackend(debtData);
         }
     }
@@ -6454,25 +6565,25 @@ function recordPayment(debtId) {
     
     updatePaymentAccountSelect();
 
-        const saveBtn = document.querySelector('#paymentModal button[onclick="updatePayment"]');
+    const saveBtn = document.querySelector('#paymentModal button[onclick="updatePayment"]');
     if (saveBtn) {
         saveBtn.textContent = 'บันทึกการชำระ';
         saveBtn.onclick = savePayment;
     }
     
-        const debtPayments = payments.filter(p => p.debtId === debtId);
+    const debtPayments = payments.filter(p => p.debtId === debtId);
     const paidAmount = debtPayments.reduce((sum, p) => sum + p.amount, 0);
     const remainingAmount = debt.totalAmount - paidAmount;
     
-        document.getElementById('paymentDebtName').innerHTML = `
+    document.getElementById('paymentDebtName').innerHTML = `
         ${debt.name}
         <span class="text-xs text-slate-400 block">${debt.categoryName} ${debt.tag ? '• ' + debt.tag : ''}</span>
     `;
     document.getElementById('paymentRemainingAmount').textContent = `฿${remainingAmount.toLocaleString()}`;
     
-        window.currentDebtForPayment = debt;
+    window.currentDebtForPayment = debt;
     
-        document.getElementById('paymentAmount').value = debt.monthlyPayment;
+    document.getElementById('paymentAmount').value = debt.monthlyPayment;
     document.getElementById('paymentDate').value = new Date().toISOString().split('T')[0];
     document.getElementById('paymentNote').value = '';
     
@@ -6492,7 +6603,8 @@ function updatePaymentAccountSelect() {
 
 function closePaymentModal() {
     document.getElementById('paymentModal').classList.add('hidden');
-    resetPaymentModal(); }
+    resetPaymentModal(); 
+}
 
 async function savePayment() {
     const accountId = document.getElementById('paymentAccountSelect').value;
@@ -6505,7 +6617,7 @@ async function savePayment() {
         return;
     }
     
-        const paymentId = 'payment_' + Date.now();
+    const paymentId = 'payment_' + Date.now();
     const paymentData = {
         id: paymentId,
         debtId: selectedDebtForPayment,
@@ -6526,7 +6638,7 @@ async function savePayment() {
     }
 
     
-        if (window.currentDebtForPayment) {
+    if (window.currentDebtForPayment) {
         const debt = window.currentDebtForPayment;
         const now = new Date();
         const expenseData = {
@@ -6540,16 +6652,18 @@ async function savePayment() {
             rawDate: date,
             monthKey: getMonthKeyFromDate(date),
             date: date,
-            accountId: accountId,             isDebtPayment: true,             originalDebtId: debt.id,
+            accountId: accountId, 
+            isDebtPayment: true, 
+            originalDebtId: debt.id,
             originalPaymentId: paymentId,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
         
-                try {
+        try {
             await financeDB.saveTransaction(expenseData);
             
-                        const exists = transactions.some(t => t.id === expenseData.id);
+            const exists = transactions.some(t => t.id === expenseData.id);
             if (!exists) {
                 transactions.unshift(expenseData);
             }
@@ -6564,7 +6678,7 @@ async function savePayment() {
     closePaymentModal();
     renderDebtPage();
     
-        updateUI();
+    updateUI();
     refreshAnalysisCharts();
     
     showToast(`✅ บันทึกการชำระหนี้สำเร็จ (฿${amount.toLocaleString()})`);
@@ -6581,14 +6695,15 @@ function editPayment(paymentId) {
     
     editingPaymentId = paymentId;
     selectedDebtForPayment = payment.debtId;
-    window.currentDebtForPayment = debt;     
+    window.currentDebtForPayment = debt; 
+    
     updatePaymentAccountSelect();
 
-        const debtPayments = payments.filter(p => p.debtId === payment.debtId && p.id !== paymentId);
+    const debtPayments = payments.filter(p => p.debtId === payment.debtId && p.id !== paymentId);
     const paidAmount = debtPayments.reduce((sum, p) => sum + p.amount, 0);
     const remainingAmount = debt.totalAmount - paidAmount;
     
-        document.getElementById('paymentDebtName').innerHTML = `
+    document.getElementById('paymentDebtName').innerHTML = `
         ${debt.name}
         <span class="text-xs text-slate-400 block">${debt.categoryName} ${debt.tag ? '• ' + debt.tag : ''}</span>
     `;
@@ -6599,11 +6714,11 @@ function editPayment(paymentId) {
         accountSelect.value = payment.accountId;
     }
 
-        document.getElementById('paymentAmount').value = payment.amount;
+    document.getElementById('paymentAmount').value = payment.amount;
     document.getElementById('paymentDate').value = payment.date;
     document.getElementById('paymentNote').value = payment.note || '';
     
-        const saveBtn = document.querySelector('#paymentModal button[onclick="savePayment()"]');
+    const saveBtn = document.querySelector('#paymentModal button[onclick="savePayment()"]');
     if (saveBtn) {
         saveBtn.textContent = 'อัปเดตการชำระ';
         saveBtn.onclick = updatePayment;
@@ -6613,7 +6728,8 @@ function editPayment(paymentId) {
 }
 
 async function updatePayment() {
-    const accountId = document.getElementById('paymentAccountSelect').value;     const amount = parseFloat(document.getElementById('paymentAmount').value);
+    const accountId = document.getElementById('paymentAccountSelect').value; 
+    const amount = parseFloat(document.getElementById('paymentAmount').value);
     const date = document.getElementById('paymentDate').value;
     const note = document.getElementById('paymentNote').value.trim();
     
@@ -6635,15 +6751,16 @@ async function updatePayment() {
     const payment = payments[paymentIndex];
     const debt = debts.find(d => d.id === payment.debtId);
     
-        payments[paymentIndex] = {
+    payments[paymentIndex] = {
         ...payment,
-        accountId: accountId,         amount,
+        accountId: accountId, 
+        amount,
         date,
         note,
         updatedAt: new Date().toISOString()
     };
     
-        if (debt) {
+    if (debt) {
         try {
             const expense = transactions.find(t => 
                 t.originalPaymentId === editingPaymentId
@@ -6652,7 +6769,8 @@ async function updatePayment() {
             if (expense) {
                 const updatedExpense = {
                     ...expense,
-                    accountId: accountId,                     amount: amount,
+                    accountId: accountId, 
+                    amount: amount,
                     date: date,
                     rawDate: date,
                     desc: debt.name + ' (ผ่อนหนี้)',
@@ -6685,9 +6803,10 @@ function resetPaymentModal() {
     selectedDebtForPayment = null;
     window.currentDebtForPayment = null;
     
-        const accountSelect = document.getElementById('paymentAccountSelect');
+    const accountSelect = document.getElementById('paymentAccountSelect');
     if (accountSelect && accounts.length > 0) {
-        accountSelect.value = currentAccountId;     }
+        accountSelect.value = currentAccountId; 
+    }
     
     const saveBtn = document.querySelector('#paymentModal button[onclick="updatePayment"]');
     if (saveBtn) {
@@ -6709,11 +6828,11 @@ function deletePayment(paymentId) {
         async () => {
 
 
-                            if (isLoggedIn && navigator.onLine) {
+            if (isLoggedIn && navigator.onLine) {
                 await deleteDebtPaymentFromBackend(paymentId);
             }
 
-                        if (debt) {
+            if (debt) {
                 try {
                     const expense = transactions.find(t => 
                         t.originalPaymentId === paymentId || 
@@ -6721,9 +6840,9 @@ function deletePayment(paymentId) {
                     );
                     
                     if (expense) {
-                                                await financeDB.deleteTransaction(expense.id);
+                        await financeDB.deleteTransaction(expense.id);
                         
-                                                transactions = transactions.filter(t => t.id !== expense.id);
+                        transactions = transactions.filter(t => t.id !== expense.id);
                         
                         console.log('✅ ลบ expense สำหรับการผ่อนหนี้สำเร็จ');
                     }
@@ -6732,11 +6851,11 @@ function deletePayment(paymentId) {
                 }
             }
             
-                        payments = payments.filter(p => p.id !== paymentId);
+            payments = payments.filter(p => p.id !== paymentId);
             savePaymentsToStorage();
             renderDebtPage();
             
-                        updateUI();
+            updateUI();
             refreshAnalysisCharts();
             
             showToast('ลบรายการชำระสำเร็จ');
@@ -6753,43 +6872,43 @@ function deleteDebt(debtId) {
     const isClosedDebt = debt.status === 'closed';
     
     if (isClosedDebt) {
-                showConfirm(
+        showConfirm(
             'ลบรายการหนี้ที่ปิดแล้ว?',
             `ลบรายการหนี้ "${debtName}" จากรายการที่ปิดแล้ว\n` +
             '⚠️ การชำระเงินและ transaction ที่เกี่ยวข้องจะไม่ถูกลบ',
             () => {
-                                debts = debts.filter(d => d.id !== debtId);
+                debts = debts.filter(d => d.id !== debtId);
                 
-                                saveDebtsToStorage();
+                saveDebtsToStorage();
                 
-                                renderDebtPage();
+                renderDebtPage();
                 
                 showToast(`🗑️ ลบรายการหนี้ "${debtName}" จากรายการที่ปิดแล้วสำเร็จ`);
                 hideConfirm();
             }
         );
     } else {
-                showConfirm(
+        showConfirm(
             'ลบรายการหนี้?', 
             'ลบแล้วจะกู้คืนไม่ได้ รวมถึงประวัติการชำระที่เกี่ยวข้อง', 
             async () => {
-                                const debtToDelete = debts.find(d => d.id === debtId);
+                const debtToDelete = debts.find(d => d.id === debtId);
                 debts = debts.filter(d => d.id !== debtId);
                 
-                                const relatedPayments = payments.filter(p => p.debtId === debtId);
+                const relatedPayments = payments.filter(p => p.debtId === debtId);
                 payments = payments.filter(p => p.debtId !== debtId);
                 
-                                if (debtToDelete && relatedPayments.length > 0) {
+                if (debtToDelete && relatedPayments.length > 0) {
                     try {
                         const relatedExpenses = transactions.filter(t => 
                             t.isDebtPayment && t.originalDebtId === debtId
                         );
                         
-                                                for (const expense of relatedExpenses) {
+                        for (const expense of relatedExpenses) {
                             await financeDB.deleteTransaction(expense.id);
                         }
                         
-                                                transactions = transactions.filter(t => 
+                        transactions = transactions.filter(t => 
                             !(t.isDebtPayment && t.originalDebtId === debtId)
                         );
                         
@@ -6803,7 +6922,7 @@ function deleteDebt(debtId) {
                 savePaymentsToStorage();
                 renderDebtPage();
                 
-                                updateUI();
+                updateUI();
                 refreshAnalysisCharts();
                 
                 showToast('✅ ลบรายการหนี้และ transaction สำเร็จ');
@@ -6817,29 +6936,29 @@ function closeDebt(debtId) {
     const debt = debts.find(d => d.id === debtId);
     if (!debt) return;
     
-        const debtPayments = payments.filter(p => p.debtId === debtId);
+    const debtPayments = payments.filter(p => p.debtId === debtId);
     const paidAmount = debtPayments.reduce((sum, p) => sum + p.amount, 0);
     const remainingAmount = debt.totalAmount - paidAmount;
     
-        if (remainingAmount > 0) {
+    if (remainingAmount > 0) {
         showToast(`❌ โปรดชำระหนี้ให้ครบก่อน (เหลืออีก ฿${remainingAmount.toLocaleString()})`);
         return;
     }
     
-        showConfirm(
+    showConfirm(
         'ปิดหนี้?', 
         `ยืนยันการปิดหนี้ "${debt.name}"\nชำระครบ ฿${paidAmount.toLocaleString()} แล้ว`,
         () => {
-                        debt.status = 'closed';
+            debt.status = 'closed';
             debt.closedAt = new Date().toISOString();
             debt.closingNote = `ชำระครบ ${paidAmount.toLocaleString()} บาท`;
             debt.updatedAt = new Date().toISOString();
             
-                        saveDebtsToStorage();
+            saveDebtsToStorage();
             
-                        renderDebtPage();
+            renderDebtPage();
             
-                        showToast(`✅ ปิดหนี้ "${debt.name}" สำเร็จ`);
+            showToast(`✅ ปิดหนี้ "${debt.name}" สำเร็จ`);
             
             hideConfirm();
         }
@@ -6854,16 +6973,16 @@ function reopenDebt(debtId) {
         'เปิดหนี้ใหม่?', 
         `ยืนยันการเปิดหนี้ "${debt.name}" ใหม่\nสามารถติดตามการชำระต่อได้`,
         () => {
-                        debt.status = 'open';
+            debt.status = 'open';
             debt.closedAt = null;
             debt.closingNote = '';
             debt.updatedAt = new Date().toISOString();
             
-                        saveDebtsToStorage();
+            saveDebtsToStorage();
             
-                        renderDebtPage();
+            renderDebtPage();
             
-                        showToast(`📝 เปิดหนี้ "${debt.name}" ใหม่สำเร็จ`);
+            showToast(`📝 เปิดหนี้ "${debt.name}" ใหม่สำเร็จ`);
             
             hideConfirm();
         }
@@ -6881,33 +7000,33 @@ function savePaymentsToStorage() {
 function switchPieChartTab(tab) {
     currentPieChartTab = tab;
     
-        const catBtn = document.getElementById('pieTabCategories');
+    const catBtn = document.getElementById('pieTabCategories');
     const tagBtn = document.getElementById('pieTabTags');
     
     if (tab === 'categories') {
         catBtn.className = "px-3 py-1 text-xs font-bold rounded-full bg-indigo-600 text-white";
         tagBtn.className = "px-3 py-1 text-xs font-bold rounded-full bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300";
         
-                document.getElementById('pieChartCategoriesContainer').classList.remove('hidden');
+        document.getElementById('pieChartCategoriesContainer').classList.remove('hidden');
         document.getElementById('pieChartTagsContainer').classList.add('hidden');
     } else {
         catBtn.className = "px-3 py-1 text-xs font-bold rounded-full bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300";
         tagBtn.className = "px-3 py-1 text-xs font-bold rounded-full bg-indigo-600 text-white";
         
-                document.getElementById('pieChartCategoriesContainer').classList.add('hidden');
+        document.getElementById('pieChartCategoriesContainer').classList.add('hidden');
         document.getElementById('pieChartTagsContainer').classList.remove('hidden');
         
-                updateTagPieChart();
+        updateTagPieChart();
     }
 }
 
 function openYearlyCategoryModal(category, monthIndex, year) {
     console.log(`เปิด modal: ${category} เดือนที่ ${monthIndex + 1} ปี ${year}`);
     
-        let icon = '📁';
+    let icon = '📁';
     let categoryType = 'unknown';
     
-        const allCats = [
+    const allCats = [
         ...customCategories.income.map(c => ({...c, type: 'income'})),
         ...customCategories.spending.map(c => ({...c, type: 'spending'})),
         ...customCategories.investment.map(c => ({...c, type: 'investment'}))
@@ -6928,63 +7047,63 @@ function openYearlyCategoryModal(category, monthIndex, year) {
         categoryType = 'investment_summary';
     }
     
-        const monthKey = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
+    const monthKey = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
     
-        let monthTransactions = [];
+    let monthTransactions = [];
     
     if (category === 'รวมรายรับ') {
-                monthTransactions = transactions.filter(t => 
+        monthTransactions = transactions.filter(t => 
             t.monthKey === monthKey && 
             t.type === 'income'
         );
     } else if (category === 'รวมรายจ่าย') {
-                monthTransactions = transactions.filter(t => 
+        monthTransactions = transactions.filter(t => 
             t.monthKey === monthKey && 
             t.type === 'expense' &&
             customCategories.spending.some(c => c.label === t.category)
         );
     } else if (category === 'รวมลงทุน') {
-                monthTransactions = transactions.filter(t => 
+        monthTransactions = transactions.filter(t => 
             t.monthKey === monthKey && 
             t.type === 'expense' &&
             customCategories.investment.some(c => c.label === t.category)
         );
     } else if (categoryType === 'income') {
-                monthTransactions = transactions.filter(t => 
+        monthTransactions = transactions.filter(t => 
             t.monthKey === monthKey && 
             t.category === category &&
             t.type === 'income'
         );
     } else {
-                monthTransactions = transactions.filter(t => 
+        monthTransactions = transactions.filter(t => 
             t.monthKey === monthKey && 
             t.category === category &&
             t.type === 'expense'
         );
     }
 
-        if (accountFilterId !== 'all') {
+    if (accountFilterId !== 'all') {
         monthTransactions = monthTransactions.filter(t => 
             t.accountId === accountFilterId || 
             (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
         );
     }
     
-        monthTransactions.sort((a, b) => {
+    monthTransactions.sort((a, b) => {
         const dateA = new Date(a.rawDate || a.date);
         const dateB = new Date(b.rawDate || b.date);
         return dateB - dateA;
     });
     
-        const totalAmount = monthTransactions.reduce((sum, t) => sum + t.amount, 0);
+    const totalAmount = monthTransactions.reduce((sum, t) => sum + t.amount, 0);
     
-        document.getElementById('modalCategoryIcon').textContent = icon;
+    document.getElementById('modalCategoryIcon').textContent = icon;
     document.getElementById('modalCategoryTitle').textContent = `${icon} ${category}`;
     document.getElementById('modalCategoryPeriod').textContent = `${monthNames[monthIndex]} ${year}`;
     document.getElementById('modalTotalAmount').textContent = `฿${totalAmount.toLocaleString()}`;
     document.getElementById('modalTransactionCount').textContent = `${monthTransactions.length} รายการ`;
     
-        const listContainer = document.getElementById('yearlyCategoryDetailList');
+    const listContainer = document.getElementById('yearlyCategoryDetailList');
     
     if (monthTransactions.length === 0) {
         listContainer.innerHTML = `
@@ -7004,10 +7123,10 @@ function openYearlyCategoryModal(category, monthIndex, year) {
             
             const tag = t.tag ? `<span class="text-[10px] font-bold text-indigo-400 uppercase ml-2">[${t.tag}]</span>` : '';
             
-                        const amountClass = t.type === 'income' ? 'text-emerald-500' : 'text-rose-500';
+            const amountClass = t.type === 'income' ? 'text-emerald-500' : 'text-rose-500';
             const prefix = t.type === 'income' ? '+' : '-';
             
-                        const onClickAction = isMobile() 
+            const onClickAction = isMobile() 
                 ? `onclick="showMobileActionModal(${JSON.stringify(t).replace(/"/g, '&quot;')})"`
                 : '';
             
@@ -7041,7 +7160,7 @@ function openYearlyCategoryModal(category, monthIndex, year) {
         }).join('');
     }
     
-        document.getElementById('yearlyCategoryDetailModal').classList.remove('hidden');
+    document.getElementById('yearlyCategoryDetailModal').classList.remove('hidden');
 }
 
 function closeYearlyCategoryModal() {
@@ -7051,9 +7170,9 @@ function closeYearlyCategoryModal() {
 function updateTagPieChart() {
     console.log('📊 updateTagPieChart() called');
     
-        const tagData = getTagAnalysisData();
+    const tagData = getTagAnalysisData();
     
-        const container = document.getElementById('tagPieChart')?.parentElement;
+    const container = document.getElementById('tagPieChart')?.parentElement;
     const canvas = document.getElementById('tagPieChart');
     
     if (!container) {
@@ -7061,35 +7180,35 @@ function updateTagPieChart() {
         return;
     }
     
-        const hasData = tagData.hasTagData && tagData.topTags.length > 0;
+    const hasData = tagData.hasTagData && tagData.topTags.length > 0;
     
-        if (!hasData) {
+    if (!hasData) {
         console.log('⚠️ No data for tagPieChart');
         
-                if (canvas) {
+        if (canvas) {
             canvas.style.display = 'none';
         }
         
-                const existingMessage = container.querySelector('.no-data-message-tagpie');
+        const existingMessage = container.querySelector('.no-data-message-tagpie');
         if (existingMessage) {
             return;
         }
         
-                const message = document.createElement('div');
+        const message = document.createElement('div');
         message.className = 'no-data-message-tagpie h-64 flex items-center justify-center text-slate-400 text-sm italic';
         message.textContent = 'ไม่มีข้อมูล TAG';
         container.appendChild(message);
         return;
     }
     
-        console.log('✅ Has data for tag pie chart');
+    console.log('✅ Has data for tag pie chart');
     
-        const noDataMsg = container.querySelector('.no-data-message-tagpie');
+    const noDataMsg = container.querySelector('.no-data-message-tagpie');
     if (noDataMsg) {
         noDataMsg.remove();
     }
     
-        if (canvas) {
+    if (canvas) {
         canvas.style.display = 'block';
     } else {
         const newCanvas = document.createElement('canvas');
@@ -7097,13 +7216,14 @@ function updateTagPieChart() {
         container.appendChild(newCanvas);
     }
     
-        const ctx = document.getElementById('tagPieChart').getContext('2d');
+    const ctx = document.getElementById('tagPieChart').getContext('2d');
     
-        const topTags = tagData.topTags.slice(0, 8);     const labels = topTags.map(t => `#${t.tag}`);
+    const topTags = tagData.topTags.slice(0, 8); 
+    const labels = topTags.map(t => `#${t.tag}`);
     const amounts = topTags.map(t => t.amount);
     const colors = generateColors(topTags.length);
     
-        if (tagPieChart) {
+    if (tagPieChart) {
         tagPieChart.data.labels = labels;
         tagPieChart.data.datasets[0].data = amounts;
         tagPieChart.data.datasets[0].backgroundColor = colors;
@@ -7150,7 +7270,7 @@ function updateTagPieChart() {
 }
 
 function switchPage(page) {
-        document.getElementById('page-overview').classList.toggle('hidden', page !== 'overview');
+    document.getElementById('page-overview').classList.toggle('hidden', page !== 'overview');
     document.getElementById('page-budget').classList.toggle('hidden', page !== 'budget');
     document.getElementById('page-debt').classList.toggle('hidden', page !== 'debt');
     document.getElementById('page-analysis').classList.toggle('hidden', page !== 'analysis');
@@ -7158,13 +7278,13 @@ function switchPage(page) {
     document.getElementById('page-accounts').classList.toggle('hidden', page !== 'accounts');
     document.getElementById('page-more').classList.toggle('hidden', page !== 'more');
     
-        document.getElementById('monthSelector').classList.toggle('hidden', 
+    document.getElementById('monthSelector').classList.toggle('hidden', 
         page === 'yearly' || page === 'analysis' || page === 'accounts' || 
         page === 'debt' || page === 'more');
     
     updateAccountFilterDropdown();
 
-        ['overview', 'budget', 'debt', 'analysis', 'yearly', 'accounts', 'more'].forEach(n => {
+    ['overview', 'budget', 'debt', 'analysis', 'yearly', 'accounts', 'more'].forEach(n => {
         const btn = document.getElementById(`nav-${n}`);
         if (btn) {
             if (n === 'more' && !isMobile()) {
@@ -7179,7 +7299,7 @@ function switchPage(page) {
         }
     });
     
-        updateAllAccountIndicators();
+    updateAllAccountIndicators();
     
     if(page === 'budget') {
         updateBudgetUI(); 
@@ -7196,14 +7316,14 @@ function switchPage(page) {
     } else if(page === 'accounts') {
         renderAccountsList();
         
-                console.log("📱 เปิดหน้า accounts, เรียก initTransferForm()");
+        console.log("📱 เปิดหน้า accounts, เรียก initTransferForm()");
         
-                setTimeout(() => {
+        setTimeout(() => {
             if (document.getElementById('transferFromAccount')) {
                 initTransferForm();
             } else {
                 console.warn("⚠️ ไม่พบ transferForm ใน DOM, จะลองอีกครั้ง");
-                                setTimeout(initTransferForm, 500);
+                setTimeout(initTransferForm, 500);
             }
         }, 300);
         
@@ -7251,8 +7371,12 @@ function switchPage(page) {
                 updateBudgetUI(); 
         }
 function goToToday() {
-    currentDate = new Date();     updateMonthDisplay();     updateUI();     renderCalendar();     
-        document.getElementById('transDate').value = new Date().toISOString().split('T')[0];
+    currentDate = new Date(); 
+    updateMonthDisplay(); 
+    updateUI(); 
+    renderCalendar(); 
+    
+    document.getElementById('transDate').value = new Date().toISOString().split('T')[0];
     
     showToast("ไปยังวันนี้แล้ว");
 }
@@ -7287,17 +7411,17 @@ function goToToday() {
             select.innerHTML = html; updateTagSuggestions();
         }
         
-        
+
 
 
 function getAccountBalance(accountId) {
     const account = accounts.find(a => a.id === accountId);
     if (!account) return 0;
     
-        let balanceFromTransactions = account.initialBalance || 0;
+    let balanceFromTransactions = account.initialBalance || 0;
     
-        transactions.forEach(t => {
-                if (t.accountId === accountId) {
+    transactions.forEach(t => {
+        if (t.accountId === accountId) {
             if (t.type === 'income') {
                 balanceFromTransactions += t.amount;
             } else if (t.type === 'expense') {
@@ -7307,17 +7431,18 @@ function getAccountBalance(accountId) {
             }
         }
         
-                if (t.type === 'transfer' && t.transferToAccountId === targetAccountId) {              if (t.transferType !== 'as_income') {
+        if (t.type === 'transfer' && t.transferToAccountId === targetAccountId) {  
+            if (t.transferType !== 'as_income') {
                 balanceFromTransactions += t.amount;
             }
         }
     });
     
-        if (account.adjustedBalance !== undefined) {
-                const balanceAtAdjustment = account.balanceAtAdjustment || balanceFromTransactions;
+    if (account.adjustedBalance !== undefined) {
+        const balanceAtAdjustment = account.balanceAtAdjustment || balanceFromTransactions;
         const adjustmentDiff = account.adjustedBalance - balanceAtAdjustment;
         
-                return balanceFromTransactions + adjustmentDiff;
+        return balanceFromTransactions + adjustmentDiff;
     }
     
     return balanceFromTransactions;
@@ -7352,41 +7477,41 @@ function getDefaultAccount() {
 function setDefaultAccount(accountId) {
     console.log('Setting default account:', accountId);
     
-        accounts.forEach(account => {
+    accounts.forEach(account => {
         account.isDefault = (account.id === accountId);
         account.updatedAt = new Date().toISOString();
     });
     
-        currentAccountId = accountId;
+    currentAccountId = accountId;
     localStorage.setItem('fin_current_account', accountId);
     
-        saveAccounts();
+    saveAccounts();
     
-        renderAccountsList();
+    renderAccountsList();
     
-        refreshDesktopFormContainer();
+    refreshDesktopFormContainer();
     
-        if (document.getElementById('transferFromAccount')) {
+    if (document.getElementById('transferFromAccount')) {
         updateTransferAccountSelects();
     }
     
-        updateAccountFilterDropdown();
+    updateAccountFilterDropdown();
 
-        const account = getAccountById(accountId);
+    const account = getAccountById(accountId);
     showToast(`✅ ตั้ง "${account.name}" เป็นบัญชีหลักแล้ว`);
 }
 
 function refreshDesktopFormContainer() {
     console.log('Refreshing desktop form container...');
     
-        updateAccountSelect();
+    updateAccountSelect();
     
-        if (!document.getElementById('page-overview').classList.contains('hidden')) {
+    if (!document.getElementById('page-overview').classList.contains('hidden')) {
         console.log('Currently in overview page, refreshing form...');
         
-                const formContainer = document.getElementById('formContainer');
+        const formContainer = document.getElementById('formContainer');
         if (formContainer && !formContainer.classList.contains('hidden')) {
-                        const accountSelect = document.getElementById('accountSelect');
+            const accountSelect = document.getElementById('accountSelect');
             if (accountSelect) {
                 accountSelect.value = currentAccountId;
             }
@@ -7397,7 +7522,7 @@ function refreshDesktopFormContainer() {
 function saveAccounts() {
     localStorage.setItem('fin_accounts', JSON.stringify(accounts));
     
-        if (financeDB && financeDB.db) {
+    if (financeDB && financeDB.db) {
         financeDB.saveToIndexedDB('accounts', {
             id: 'user_accounts',
             data: accounts,
@@ -7415,15 +7540,15 @@ function openAdjustBalanceModal(accountId) {
     
     adjustingAccountId = accountId;
     
-        document.getElementById('adjustAccountIcon').textContent = account.icon || '🏦';
+    document.getElementById('adjustAccountIcon').textContent = account.icon || '🏦';
     document.getElementById('adjustAccountName').textContent = account.name;
     
     const currentBalance = getAccountBalance(accountId);
     document.getElementById('adjustCurrentBalance').textContent = `฿${currentBalance.toLocaleString()}`;
     
-        document.getElementById('adjustNewBalance').value = '';
+    document.getElementById('adjustNewBalance').value = '';
     
-        document.getElementById('adjustBalanceModal').classList.remove('hidden');
+    document.getElementById('adjustBalanceModal').classList.remove('hidden');
 }
 
 function closeAdjustBalanceModal() {
@@ -7446,52 +7571,54 @@ function confirmAdjustBalance() {
     const newBalanceInput = document.getElementById('adjustNewBalance');
     const newBalance = parseFloat(newBalanceInput.value);
     
-        if (newBalanceInput.value.trim() === '') {
+    if (newBalanceInput.value.trim() === '') {
         showToast('⚠️ กรุณาพิมพ์ยอดคงเหลือที่ต้องการ');
         newBalanceInput.focus();
         return;
     }
     
-        if (isNaN(newBalance)) {
+    if (isNaN(newBalance)) {
         showToast('⚠️ กรุณาพิมพ์ตัวเลขเท่านั้น');
         newBalanceInput.value = '';
         newBalanceInput.focus();
         return;
     }
     
-        if (newBalance < 0) {
+    if (newBalance < 0) {
         showToast('⚠️ ยอดคงเหลือต้องไม่ติดลบ');
         newBalanceInput.value = '';
         newBalanceInput.focus();
         return;
     }
     
-        let baseTransactionBalance = account.initialBalance || 0;
+    let baseTransactionBalance = account.initialBalance || 0;
     transactions.forEach(t => {
-        if (t.accountId === targetAccountId) {              if (t.type === 'income') baseTransactionBalance += t.amount;
+        if (t.accountId === targetAccountId) {  
+            if (t.type === 'income') baseTransactionBalance += t.amount;
             else if (t.type === 'expense') baseTransactionBalance -= t.amount;
             else if (t.type === 'transfer') baseTransactionBalance -= t.amount;
         }
-        if (t.type === 'transfer' && t.transferToAccountId === targetAccountId) {              if (t.transferType !== 'as_income') baseTransactionBalance += t.amount;
+        if (t.type === 'transfer' && t.transferToAccountId === targetAccountId) {  
+            if (t.transferType !== 'as_income') baseTransactionBalance += t.amount;
         }
     });
     
-        const currentBalance = baseTransactionBalance + (account.manualAdjustment || 0);
+    const currentBalance = baseTransactionBalance + (account.manualAdjustment || 0);
     
-        if (Math.abs(newBalance - currentBalance) < 0.01) {
+    if (Math.abs(newBalance - currentBalance) < 0.01) {
         showToast('ℹ️ ยอดคงเหลือเท่าเดิม');
         closeAdjustBalanceModal();
         return;
     }
     
-        const newManualAdjustment = newBalance - baseTransactionBalance;
+    const newManualAdjustment = newBalance - baseTransactionBalance;
     
-        if (confirm(`ปรับยอดจาก ฿${currentBalance.toLocaleString()} เป็น ฿${newBalance.toLocaleString()}?`)) {
-                account.manualAdjustment = newManualAdjustment;
+    if (confirm(`ปรับยอดจาก ฿${currentBalance.toLocaleString()} เป็น ฿${newBalance.toLocaleString()}?`)) {
+        account.manualAdjustment = newManualAdjustment;
         account.lastAdjustment = new Date().toISOString();
         account.updatedAt = new Date().toISOString();
         
-                if (!account.balanceAdjustments) {
+        if (!account.balanceAdjustments) {
             account.balanceAdjustments = [];
         }
         account.balanceAdjustments.push({
@@ -7502,13 +7629,13 @@ function confirmAdjustBalance() {
             adjustment: newManualAdjustment
         });
         
-                saveAccounts();
+        saveAccounts();
         
-                renderAccountsList();
+        renderAccountsList();
         
-                closeAdjustBalanceModal();
+        closeAdjustBalanceModal();
         
-                showToast(`✅ ปรับยอด ${account.name} สำเร็จ: ฿${newBalance.toLocaleString()}`);
+        showToast(`✅ ปรับยอด ${account.name} สำเร็จ: ฿${newBalance.toLocaleString()}`);
     }
 }
 
@@ -7516,7 +7643,7 @@ function getAccountBalance(accountId) {
     const account = accounts.find(a => a.id === accountId);
     if (!account) return 0;
     
-        let baseBalance = account.initialBalance || 0;
+    let baseBalance = account.initialBalance || 0;
     
     transactions.forEach(t => {
         if (t.accountId === accountId) {
@@ -7529,7 +7656,7 @@ function getAccountBalance(accountId) {
         }
     });
     
-        if (account.manualAdjustment !== undefined) {
+    if (account.manualAdjustment !== undefined) {
         return baseBalance + account.manualAdjustment;
     }
     
@@ -7540,7 +7667,7 @@ function renderAccountsList() {
     const container = document.getElementById('accountsListContainer');
     if (!container) return;
     
-        document.getElementById('totalAccountsCount').textContent = accounts.length;
+    document.getElementById('totalAccountsCount').textContent = accounts.length;
     document.getElementById('totalBalanceAll').textContent = `฿${calculateTotalBalance().toLocaleString()}`;
     
     if (accounts.length === 0) {
@@ -7561,7 +7688,7 @@ function renderAccountsList() {
         const balanceClass = balance >= 0 ? 'text-emerald-600' : 'text-rose-600';
         const isDefault = account.isDefault ? 'บัญชีหลัก' : '';
         
-                const hasAdjustment = account.adjustedBalance !== undefined ? 
+        const hasAdjustment = account.adjustedBalance !== undefined ? 
             '<span class="ml-1 text-[8px] bg-indigo-100 text-indigo-600 px-1 rounded">ปรับแล้ว</span>' : '';
         
         return `
@@ -7633,7 +7760,6 @@ function openAddAccountModal() {
     selectedAccountIcon = '🏦';
     document.getElementById('selectedAccountIcon').textContent = '🏦';
     
-        
     
     document.getElementById('accountModal').classList.remove('hidden');
 }
@@ -7652,7 +7778,6 @@ function openEditAccountModal(accountId) {
     selectedAccountIcon = account.icon || '🏦';
     document.getElementById('selectedAccountIcon').textContent = selectedAccountIcon;
     
-        
     
     document.getElementById('accountModal').classList.remove('hidden');
 }
@@ -7675,7 +7800,7 @@ function applyBalanceAdjustment() {
     const currentBalance = getAccountBalance(account.id);
     let newBalance = currentBalance;
     
-        switch(adjustType) {
+    switch(adjustType) {
         case 'set':
             newBalance = adjustAmount;
             break;
@@ -7687,7 +7812,7 @@ function applyBalanceAdjustment() {
             break;
     }
     
-        const now = new Date();
+    const now = new Date();
     const adjustmentTransaction = {
         id: `balance_adjust_${Date.now()}`,
         amount: Math.abs(newBalance - currentBalance),
@@ -7700,36 +7825,37 @@ function applyBalanceAdjustment() {
         monthKey: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
         date: now.toISOString().split('T')[0],
         accountId: account.id,
-        isBalanceAdjustment: true,         originalBalance: currentBalance,
+        isBalanceAdjustment: true, 
+        originalBalance: currentBalance,
         newBalance: newBalance,
         createdAt: now.toISOString(),
         updatedAt: now.toISOString()
     };
     
-        showConfirm(
+    showConfirm(
         'ยืนยันการปรับยอดคงเหลือ?',
         `จาก ฿${currentBalance.toLocaleString()} → ฿${newBalance.toLocaleString()}\n\n` +
         '⚠️ การปรับยอดนี้จะถูกบันทึกเป็น transaction และไม่กระทบกับประวัติเดิม',
         async () => {
             try {
-                                const result = await financeDB.saveTransaction(adjustmentTransaction);
+                const result = await financeDB.saveTransaction(adjustmentTransaction);
                 
                 if (result.success) {
-                                        const exists = transactions.some(t => t.id === adjustmentTransaction.id);
+                    const exists = transactions.some(t => t.id === adjustmentTransaction.id);
                     if (!exists) {
                         transactions.unshift(adjustmentTransaction);
                     }
                     
-                                        const newBalance = getAccountBalance(account.id);
+                    const newBalance = getAccountBalance(account.id);
                     document.getElementById('currentBalanceDisplay').textContent = `฿${newBalance.toLocaleString()}`;
                     
-                                        document.getElementById('adjustBalanceAmount').value = '';
+                    document.getElementById('adjustBalanceAmount').value = '';
                     
-                                        if (!document.getElementById('page-accounts').classList.contains('hidden')) {
+                    if (!document.getElementById('page-accounts').classList.contains('hidden')) {
                         renderAccountsList();
                     }
                     
-                                        updateAccountSelect();
+                    updateAccountSelect();
                     updateAccountFilterDropdown();
                     
                     showToast(`✅ ปรับยอดคงเหลือสำเร็จ: ฿${newBalance.toLocaleString()}`);
@@ -7752,7 +7878,6 @@ function closeAccountModal() {
     document.getElementById('accountModal').classList.add('hidden');
     editingAccountId = null;
     
-        
 }
 
 function selectAccountIcon(icon) {
@@ -7772,27 +7897,28 @@ function saveAccount() {
     const isDefault = document.getElementById('isDefaultAccount').checked;
     
     if (editingAccountId) {
-                const account = getAccountById(editingAccountId);
+        const account = getAccountById(editingAccountId);
         if (account) {
             account.name = name;
             account.type = type;
             account.icon = selectedAccountIcon;
-                        account.updatedAt = new Date().toISOString();
+            account.updatedAt = new Date().toISOString();
 
-                        if (isLoggedIn && navigator.onLine) {
-                updateAccountInBackend(account);              }
+            if (isLoggedIn && navigator.onLine) {
+                updateAccountInBackend(account);  
+            }
             
             if (isDefault) {
                 setDefaultAccount(account.id);
             } else if (account.isDefault && !isDefault) {
-                                const otherAccount = accounts.find(a => a.id !== account.id);
+                const otherAccount = accounts.find(a => a.id !== account.id);
                 if (otherAccount) {
                     setDefaultAccount(otherAccount.id);
                 }
             }
         }
     } else {
-                const newAccount = {
+        const newAccount = {
             id: 'acc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
             name,
             type,
@@ -7810,7 +7936,7 @@ function saveAccount() {
             saveAccountToBackend(newAccount);
         }
         
-                if (initialBalance > 0) {
+        if (initialBalance > 0) {
             const now = new Date();
             const initialTransaction = {
                 id: `initial_${newAccount.id}`,
@@ -7829,7 +7955,7 @@ function saveAccount() {
                 updatedAt: now.toISOString()
             };
             
-                        financeDB.saveTransaction(initialTransaction);
+            financeDB.saveTransaction(initialTransaction);
             transactions.unshift(initialTransaction);
         }
         
@@ -7880,12 +8006,12 @@ function deleteAccount(accountId) {
     const account = getAccountById(accountId);
     if (!account) return;
     
-        if (account.isDefault) {
+    if (account.isDefault) {
         showToast('ไม่สามารถลบบัญชีหลักได้');
         return;
     }
     
-        const hasTransactions = transactions.some(t => 
+    const hasTransactions = transactions.some(t => 
         t.accountId === accountId || t.transferToAccountId === accountId
     );
     
@@ -7922,7 +8048,7 @@ function getRandomAccountColor() {
 function updateAccountSelect() {
     console.log("🔄 updateAccountSelect() ถูกเรียก");
     
-        const desktopSelect = document.getElementById('accountSelect');
+    const desktopSelect = document.getElementById('accountSelect');
     if (desktopSelect) {
         desktopSelect.innerHTML = accounts.map(acc => `
             <option value="${acc.id}" ${acc.id === currentAccountId ? 'selected' : ''}>
@@ -7930,12 +8056,12 @@ function updateAccountSelect() {
             </option>
         `).join('');
         
-                if (!desktopSelect.value || !accounts.some(a => a.id === desktopSelect.value)) {
+        if (!desktopSelect.value || !accounts.some(a => a.id === desktopSelect.value)) {
             desktopSelect.value = currentAccountId;
         }
     }
     
-        const mobileSelect = document.getElementById('mobileAccountSelect');
+    const mobileSelect = document.getElementById('mobileAccountSelect');
     if (mobileSelect) {
         mobileSelect.innerHTML = accounts.map(acc => `
             <option value="${acc.id}" ${acc.id === currentAccountId ? 'selected' : ''}>
@@ -7943,14 +8069,14 @@ function updateAccountSelect() {
             </option>
         `).join('');
         
-                if (!mobileSelect.value || !accounts.some(a => a.id === mobileSelect.value)) {
+        if (!mobileSelect.value || !accounts.some(a => a.id === mobileSelect.value)) {
             mobileSelect.value = currentAccountId;
         }
     }
 }
 
 function updateAccountFilterDropdown() {
-        const dropdownIds = [
+    const dropdownIds = [
         'accountFilterSelect',
         'budgetAccountFilterMobile',
         'budgetAccountFilterDesktop',
@@ -7960,7 +8086,7 @@ function updateAccountFilterDropdown() {
         'yearlyAccountFilterDesktop'
     ];
     
-        const optionsHTML = `
+    const optionsHTML = `
         <option value="all">📊 ทุกบัญชี</option>
         ${accounts.map(acc => `
             <option value="${acc.id}">
@@ -7969,25 +8095,26 @@ function updateAccountFilterDropdown() {
         `).join('')}
     `;
     
-        dropdownIds.forEach(id => {
+    dropdownIds.forEach(id => {
         const select = document.getElementById(id);
         if (select) {
-                        const currentValue = accountFilterId || 'all';
+            const currentValue = accountFilterId || 'all';
             select.innerHTML = optionsHTML;
-            select.value = currentValue;             
-                        select.removeEventListener('change', applyAccountFilter);
-                        select.addEventListener('change', applyAccountFilter);
+            select.value = currentValue; 
+            
+            select.removeEventListener('change', applyAccountFilter);
+            select.addEventListener('change', applyAccountFilter);
         }
     });
 }
 
 function applyAccountFilter() {
-        const eventSource = event.target;
+    const eventSource = event.target;
     const newValue = eventSource.value;
     
-        accountFilterId = newValue;
+    accountFilterId = newValue;
     
-        const dropdownIds = [
+    const dropdownIds = [
         'accountFilterSelect',
         'budgetAccountFilterMobile',
         'budgetAccountFilterDesktop',
@@ -7999,13 +8126,14 @@ function applyAccountFilter() {
     
     dropdownIds.forEach(id => {
         const select = document.getElementById(id);
-        if (select && select.id !== eventSource.id) {             select.value = accountFilterId;
+        if (select && select.id !== eventSource.id) { 
+            select.value = accountFilterId;
         }
     });
     
-        updateAllAccountIndicators();
+    updateAllAccountIndicators();
     
-        const currentPage = getCurrentPage();
+    const currentPage = getCurrentPage();
     
     switch(currentPage) {
         case 'overview':
@@ -8022,14 +8150,14 @@ function applyAccountFilter() {
             refreshAnalysisCharts();
             break;
         case 'yearly':
-                        updateYearlyUI();
-                        if (document.getElementById('y-tab-tags').classList.contains('active')) {
+            updateYearlyUI();
+            if (document.getElementById('y-tab-tags').classList.contains('active')) {
                 updateYearlyTagsUI();
             }
             break;
     }
     
-        localStorage.setItem('fin_account_filter', accountFilterId);
+    localStorage.setItem('fin_account_filter', accountFilterId);
     
     console.log(`✅ Applied account filter: ${accountFilterId} (synced all pages)`);
 }
@@ -8052,9 +8180,9 @@ function updateCalendarAccountIndicator() {
 }
 
 function updateAllAccountIndicators() {
-        updateCalendarAccountIndicator();
+    updateCalendarAccountIndicator();
     
-        const budgetIndicator = document.getElementById('budgetAccountIndicator');
+    const budgetIndicator = document.getElementById('budgetAccountIndicator');
     if (budgetIndicator) {
         if (accountFilterId !== 'all') {
             const account = getAccountById(accountFilterId);
@@ -8064,7 +8192,7 @@ function updateAllAccountIndicators() {
         }
     }
     
-        const analysisIndicator = document.getElementById('analysisAccountIndicator');
+    const analysisIndicator = document.getElementById('analysisAccountIndicator');
     if (analysisIndicator) {
         if (accountFilterId !== 'all') {
             const account = getAccountById(accountFilterId);
@@ -8074,7 +8202,7 @@ function updateAllAccountIndicators() {
         }
     }
     
-        const yearlyIndicator = document.getElementById('yearlyAccountIndicator');
+    const yearlyIndicator = document.getElementById('yearlyAccountIndicator');
     if (yearlyIndicator) {
         if (accountFilterId !== 'all') {
             const account = getAccountById(accountFilterId);
@@ -8089,7 +8217,7 @@ function setBudgetMode(mode) {
     budgetMode = mode;
     localStorage.setItem('fin_budget_mode', mode);
     
-        const percentBtn = document.getElementById('budgetModePercent');
+    const percentBtn = document.getElementById('budgetModePercent');
     const fixedBtn = document.getElementById('budgetModeFixed');
     
     if (percentBtn && fixedBtn) {
@@ -8106,7 +8234,7 @@ function setBudgetMode(mode) {
         updatePortionModalUnit(mode);
     }
     
-        updateBudgetUI();
+    updateBudgetUI();
     showToast(`✅เปลี่ยนเป็นโหมด: ${mode === 'percentage' ? 'เปอร์เซ็นต์' : 'จำนวนเงินคงที่'}`);
 }
 
@@ -8117,18 +8245,19 @@ function setBudgetMode(mode) {
     const category = document.getElementById('category').value;
     const desc = document.getElementById('desc').value.trim();
     
-        if (!amount || amount <= 0 || isNaN(amount)) {
+    if (!amount || amount <= 0 || isNaN(amount)) {
         showToast("กรุณาระบุยอดเงินที่ถูกต้อง");
         document.getElementById('amount').focus();
         return false;
     }
     
-    if (amount > 1000000000) {         showToast("ยอดเงินสูงเกินไป");
+    if (amount > 1000000000) { 
+        showToast("ยอดเงินสูงเกินไป");
         document.getElementById('amount').focus();
         return false;
     }
     
-        if (!date) {
+    if (!date) {
         showToast("กรุณาเลือกวันที่");
         document.getElementById('transDate').focus();
         return false;
@@ -8144,19 +8273,18 @@ function setBudgetMode(mode) {
         return false;
     }
     
-        if (!category) {
+    if (!category) {
         showToast("กรุณาเลือกหมวดหมู่");
         document.getElementById('category').focus();
         return false;
     }
     
-        if (!desc) {
-                document.getElementById('desc').value = category;
+    if (!desc) {
+        document.getElementById('desc').value = category;
     }
     
     return true;
 }
-
 
 
 
@@ -8167,8 +8295,8 @@ async function saveTransactionToBackend(transactionData) {
     }
     
     try {
-                let accountIdForBackend = null;
-                if (transactionData.accountId && !isNaN(parseInt(transactionData.accountId))) {
+        let accountIdForBackend = null;
+        if (transactionData.accountId && !isNaN(parseInt(transactionData.accountId))) {
             accountIdForBackend = parseInt(transactionData.accountId);
         }
         
@@ -8190,7 +8318,8 @@ async function saveTransactionToBackend(transactionData) {
                 icon: transactionData.icon,
                 rawDate: transactionData.rawDate,
                 month_key: transactionData.monthKey,
-                accountId: accountIdForBackend,                  transferToAccountId: transactionData.transferToAccountId || null
+                accountId: accountIdForBackend,  
+                transferToAccountId: transactionData.transferToAccountId || null
             })
         });
         
@@ -8226,11 +8355,11 @@ async function saveLoggedInTransaction(transactionData) {
         
         console.log('💾 saveLoggedInTransaction - saveToLocalEnabled =', saveToLocalEnabled);
         
-                if (window.financeDB) {
+        if (window.financeDB) {
             window.financeDB.setSaveToLocalEnabled(saveToLocalEnabled);
         }
         
-                let backendId = null;
+        let backendId = null;
         let backendSuccess = false;
         
         if (navigator.onLine) {
@@ -8249,8 +8378,8 @@ async function saveLoggedInTransaction(transactionData) {
             showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
         }
         
-                if (saveToLocalEnabled) {
-        console.log('💾 บันทึกลงเครื่อง (Local + IndexedDB)');
+        if (saveToLocalEnabled) {
+    console.log('💾 บันทึกลงเครื่อง (Local + IndexedDB)');
     
     if (backendId) {
         transactionData.id = backendId.toString();
@@ -8265,27 +8394,27 @@ async function saveLoggedInTransaction(transactionData) {
         console.log('✅ บันทึกในเครื่องสำเร็จ');
     }
 } else {
-        console.log('☁️ บันทึกเฉพาะ MySQL (ข้ามการบันทึกในเครื่อง)');
+    console.log('☁️ บันทึกเฉพาะ MySQL (ข้ามการบันทึกในเครื่อง)');
     
-        if (editingTxId) {
+    if (editingTxId) {
         console.log('🗑️ ลบ temporary transaction:', editingTxId);
         await financeDB.deleteTransaction(editingTxId);
         
-                transactions = transactions.filter(t => t.id !== editingTxId);
+        transactions = transactions.filter(t => t.id !== editingTxId);
         
-                if (window.financeDB) {
+        if (window.financeDB) {
             window.financeDB.removeFromLocalStorageCache(editingTxId);
         }
     }
 }
         
-                if (isLoggedIn && navigator.onLine) {
+        if (isLoggedIn && navigator.onLine) {
             console.log('🔄 โหลดข้อมูลจาก backend ใหม่...');
             await loadTransactionsFromBackend();
             isShowingBackendData = true;
         }
         
-                resetForm();
+        resetForm();
         updateUI();
         
         if (!document.getElementById('overview-calendar-content').classList.contains('hidden')) {
@@ -8309,23 +8438,23 @@ async function saveGuestTransaction(transactionData) {
     console.log('👤 Guest mode - financeDB.saveToLocalEnabled:', financeDB?.saveToLocalEnabled);
     console.log('👤 Guest mode - financeDB.saveToIndexedDBEnabled:', financeDB?.saveToIndexedDBEnabled);
     try {
-                        if (!transactionData.accountId) {
+        if (!transactionData.accountId) {
             console.warn('⚠️ Guest mode: ไม่มี accountId, ใช้ default');
             const defaultAccount = accounts.find(a => a.isDefault);
             transactionData.accountId = defaultAccount ? defaultAccount.id : 'default_acc';
         }
         console.log('👤 Guest mode: กำลังบันทึก...');
         
-                let result = await financeDB.saveTransaction(transactionData);
+        let result = await financeDB.saveTransaction(transactionData);
         
-                if (!result || !result.success) {
+        if (!result || !result.success) {
             console.log('⚠️ Guest mode: FinanceDB ล้มเหลว, ใช้ localStorage โดยตรง');
             
-                        const localTx = JSON.parse(localStorage.getItem('fin_tx_v5') || '[]');
+            const localTx = JSON.parse(localStorage.getItem('fin_tx_v5') || '[]');
             localTx.unshift(transactionData);
             localStorage.setItem('fin_tx_v5', JSON.stringify(localTx.slice(0, 1000)));
             
-                        const exists = transactions.some(t => t.id === transactionData.id);
+            const exists = transactions.some(t => t.id === transactionData.id);
             if (!exists) {
                 transactions.unshift(transactionData);
             }
@@ -8334,12 +8463,12 @@ async function saveGuestTransaction(transactionData) {
         }
         
         if (result.success) {
-                        const exists = transactions.some(t => t.id === transactionData.id);
+            const exists = transactions.some(t => t.id === transactionData.id);
             if (!exists) {
                 transactions.unshift(transactionData);
             }
             
-                        resetForm();
+            resetForm();
             updateUI();
             
             if (!document.getElementById('overview-calendar-content').classList.contains('hidden')) {
@@ -8354,7 +8483,7 @@ async function saveGuestTransaction(transactionData) {
     } catch (error) {
         console.error('Guest save error:', error);
         
-                try {
+        try {
             console.log('⚠️ Guest mode: เกิด error, ใช้ localStorage โดยตรง');
             const localTx = JSON.parse(localStorage.getItem('fin_tx_v5') || '[]');
             localTx.unshift(transactionData);
@@ -8378,7 +8507,6 @@ async function saveGuestTransaction(transactionData) {
     }
 }
 
-
 async function fixNullAccountIds() {
     console.log('🔧 เริ่มตรวจสอบและแก้ไข accountId ที่เป็น null...');
     
@@ -8392,21 +8520,20 @@ async function fixNullAccountIds() {
         if (!tx.accountId) {
             console.log('⚠️ พบ transaction ที่ accountId = null:', tx.id);
             
-                        tx.accountId = defaultId;
+            tx.accountId = defaultId;
             
-                        await financeDB.saveTransaction(tx);
+            await financeDB.saveTransaction(tx);
             fixedCount++;
         }
     }
     
     console.log(`✅ แก้ไขเรียบร้อย: ${fixedCount} รายการ`);
     
-        await loadInitialData();
+    await loadInitialData();
     updateUI();
     
     return fixedCount;
 }
-
 
 async function updateTransactionInBackend(transactionData) {
     if (!isLoggedIn || !navigator.onLine) {
@@ -8414,7 +8541,7 @@ async function updateTransactionInBackend(transactionData) {
         return false;
     }
     
-        if (transactionData.id.toString().startsWith('tx_')) {
+    if (transactionData.id.toString().startsWith('tx_')) {
         return saveTransactionToBackend(transactionData);
     }
     
@@ -8457,7 +8584,7 @@ async function deleteTransactionFromBackend(transactionId) {
         return false;
     }
     
-        if (transactionId.toString().startsWith('tx_')) {
+    if (transactionId.toString().startsWith('tx_')) {
         return true;
     }
     
@@ -8503,7 +8630,9 @@ async function saveAccountToBackend(accountData) {
         if (response.ok && result.id) {
             console.log('✅ บันทึก account ที่ backend สำเร็จ');
             
-                        accountData.id = result.id.toString();              accountData.numericId = result.id;                  saveAccounts();
+            accountData.id = result.id.toString();  
+            accountData.numericId = result.id;      
+            saveAccounts();
             
             return true;
         }
@@ -8544,6 +8673,7 @@ async function saveBudgetsToBackend() {
     }
 }
 
+
 function prepareTransactionData() {
     const amt = parseFloat(document.getElementById('amount').value);
     const catL = document.getElementById('category').value;
@@ -8553,21 +8683,22 @@ function prepareTransactionData() {
     const d = new Date(rD);
     const newMonthKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     
-        let accountId = null;
+    let accountId = null;
     const accountSelect = document.getElementById('accountSelect');
     
     if (accountSelect && accountSelect.value) {
         accountId = accountSelect.value;
     } else {
-                accountId = currentAccountId;
+        accountId = currentAccountId;
     }
     
-        if (!accountId) {
+    if (!accountId) {
         const defaultAccount = accounts.find(a => a.isDefault);
         accountId = defaultAccount ? defaultAccount.id : 'default_acc';
     }
     
-    console.log('📝 prepareTransactionData - accountId:', accountId);     
+    console.log('📝 prepareTransactionData - accountId:', accountId); 
+    
     return {
         id: editingTxId || `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         amount: amt,
@@ -8576,13 +8707,14 @@ function prepareTransactionData() {
         icon: cI ? cI.icon : '❓',
         desc: document.getElementById('desc').value.trim() || catL,
         tag: document.getElementById('tagInput').value.trim(),
-        accountId: accountId,          monthKey: newMonthKey,
+        accountId: accountId,  
+        monthKey: newMonthKey,
         rawDate: rD,
         date: rD,
         createdAt: editingTxId ? undefined : new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         
-                owner_type: isLoggedIn ? 'user' : 'guest',
+        owner_type: isLoggedIn ? 'user' : 'guest',
         owner_id: isLoggedIn ? currentUser.id : getGuestId()
     };
 }
@@ -8685,8 +8817,9 @@ function saveToLocalStorage(transaction) {
     localStorage.setItem('fin_tx_v5', JSON.stringify(localTx.slice(0, 1000)));
 }
 
+
 function updateTransactionsArray(transactionData) {
-        if (!saveToLocalEnabled && isLoggedIn) {
+    if (!saveToLocalEnabled && isLoggedIn) {
         console.log('⏭️ ข้ามการอัพเดต transactions array (ไม่บันทึกในเครื่อง)');
         return;
     }
@@ -8743,7 +8876,7 @@ async function loadUserDataFromBackend() {
         await loadDebtsFromBackend();
         await loadTagsFromBackend();
         
-                await cleanupLocalTransactions();
+        await cleanupLocalTransactions();
         
         showToast('✅ โหลดข้อมูลจากเซิร์ฟเวอร์สำเร็จ', 'success');
         updateUI();
@@ -8754,6 +8887,7 @@ async function loadUserDataFromBackend() {
     }
 }
 
+
 function updateUIAfterSave() {
     resetForm();
     updateUI();
@@ -8763,6 +8897,7 @@ function updateUIAfterSave() {
     }
     refreshAnalysisCharts();
 }
+
 
 function getGuestId() {
     let guestId = localStorage.getItem('guest_id');
@@ -8783,7 +8918,7 @@ function addToSyncQueue(transactionData) {
     });
     localStorage.setItem('syncQueue', JSON.stringify(queue));
     
-        showSyncNotification();
+    showSyncNotification();
 }
 
 function showSyncNotification() {
@@ -8795,13 +8930,13 @@ async function saveTransaction() {
     const amt = parseFloat(document.getElementById('amount').value); 
     if (!amt) return showToast("ระบุยอดเงิน");
     
-        const transactionData = prepareTransactionData();
+    const transactionData = prepareTransactionData();
     
-        await handleDebtPayment(transactionData);
+    await handleDebtPayment(transactionData);
     
-        await handleMonthChange(transactionData);
+    await handleMonthChange(transactionData);
     
-        if (isLoggedIn) {
+    if (isLoggedIn) {
         await saveLoggedInTransaction(transactionData);
     } else {
         await saveGuestTransaction(transactionData);
@@ -8817,7 +8952,7 @@ function prepareTransactionData() {
     const d = new Date(rD);
     const newMonthKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     
-        let accountId = document.getElementById('accountSelect')?.value || currentAccountId;
+    let accountId = document.getElementById('accountSelect')?.value || currentAccountId;
     let numericAccountId = null;
     
     if (accountId && !accountId.startsWith('acc_') && !isNaN(parseInt(accountId))) {
@@ -8839,7 +8974,7 @@ function prepareTransactionData() {
         createdAt: editingTxId ? undefined : new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         
-                owner_type: isLoggedIn ? 'user' : 'guest',
+        owner_type: isLoggedIn ? 'user' : 'guest',
         owner_id: isLoggedIn ? currentUser.id : getGuestId()
     };
 }
@@ -8922,9 +9057,9 @@ function editTransaction(id) {
     console.log('🖥️ desc equals category?:', t.desc === t.category);
 
     if (isMobile()) {
-                openMobileForm(t);
+        openMobileForm(t);
     } else {
-                editingTxId = id; 
+        editingTxId = id; 
         document.getElementById('formTitle').innerText = "แก้ไข"; 
         document.getElementById('submitBtn').innerText = "อัปเดต"; 
         document.getElementById('cancelEditBtn').classList.remove('hidden'); 
@@ -8936,9 +9071,9 @@ function editTransaction(id) {
         document.getElementById('transDate').value = t.rawDate; 
         document.getElementById('category').value = t.category;
         
-                if (t.isDebtPayment && t.originalPaymentId) {
+        if (t.isDebtPayment && t.originalPaymentId) {
             console.log('🏦 กำลังแก้ไขรายการผ่อนหนี้, paymentId:', t.originalPaymentId);
-                        window.editingDebtPaymentId = t.originalPaymentId;
+            window.editingDebtPaymentId = t.originalPaymentId;
         } else {
             window.editingDebtPaymentId = null;
         }
@@ -8954,9 +9089,9 @@ function editTransaction(id) {
 async function deleteTransaction(id) { 
     showConfirm("ลบรายการ?", "ลบแล้วกู้คืนไม่ได้", async () => { 
         try {
-                        const transactionToDelete = transactions.find(t => t.id === id);
+            const transactionToDelete = transactions.find(t => t.id === id);
             
-                        let isDebtPayment = false;
+            let isDebtPayment = false;
             let originalPaymentId = null;
             
             if (transactionToDelete && transactionToDelete.isDebtPayment) {
@@ -8969,21 +9104,22 @@ async function deleteTransaction(id) {
             } else if (isLoggedIn && !navigator.onLine) {
                 addToSyncQueue({ id: id }, 'delete');
             }
-                        const result = await financeDB.deleteTransaction(id);
+            const result = await financeDB.deleteTransaction(id);
             
             console.log('Delete result:', result);
             
             if (result.success) {
-                                transactions = transactions.filter(t => t.id !== id);
+                transactions = transactions.filter(t => t.id !== id);
                 
-                                if (isDebtPayment && originalPaymentId) {
+                if (isDebtPayment && originalPaymentId) {
                     console.log('🗑️ กำลังลบ payment record ที่เกี่ยวข้อง:', originalPaymentId);
                     
-                                        const paymentIndex = payments.findIndex(p => p.id === originalPaymentId);
+                    const paymentIndex = payments.findIndex(p => p.id === originalPaymentId);
                     if (paymentIndex !== -1) {
                         payments.splice(paymentIndex, 1);
-                        savePaymentsToStorage();                         
-                                                if (!document.getElementById('page-debt').classList.contains('hidden')) {
+                        savePaymentsToStorage(); 
+                        
+                        if (!document.getElementById('page-debt').classList.contains('hidden')) {
                             renderDebtPage();
                         }
                         
@@ -8991,16 +9127,16 @@ async function deleteTransaction(id) {
                     }
                 }
                 
-                                updateUI();
+                updateUI();
                 
-                                const isCalendarTabActive = !document.getElementById('overview-calendar-content').classList.contains('hidden');
+                const isCalendarTabActive = !document.getElementById('overview-calendar-content').classList.contains('hidden');
                 if (isCalendarTabActive) {
                     renderCalendar();
                 }
                 
-                                refreshAnalysisCharts();
+                refreshAnalysisCharts();
                 
-                                let toastMessage = "";
+                let toastMessage = "";
                 if (isDebtPayment) {
                     toastMessage = "✅ ลบรายการผ่อนหนี้สำเร็จ (ทั้งสองฝั่ง)";
                 } else if (result.indexedDB && result.localStorage) {
@@ -9054,7 +9190,7 @@ async function deleteTransaction(id) {
                 ? (isInv ? "% จากงบลงทุน" : "% จากรายได้")
                 : "จำนวนเงินคงที่ (บาท)";
             document.getElementById('modalHint').innerText = hintText;
-                                    const unitElement = document.getElementById('targetUnit');
+            const unitElement = document.getElementById('targetUnit');
             if (unitElement) {
                 unitElement.textContent = budgetMode === 'percentage' ? '%' : '฿';
             }
@@ -9062,8 +9198,8 @@ async function deleteTransaction(id) {
             const val = target?.value;
             const mode = target?.mode || 'percentage';
             
-        if (target && mode) {
-                const newHintText = mode === 'percentage' 
+    if (target && mode) {
+        const newHintText = mode === 'percentage' 
             ? (isInv ? "% จากงบลงทุน" : "% จากรายได้")
             : "จำนวนเงินคงที่ (บาท)";
         document.getElementById('modalHint').innerText = newHintText;
@@ -9073,7 +9209,8 @@ async function deleteTransaction(id) {
         }
     }
             
-                                    document.getElementById('targetAmountInput').value = val === undefined ? '' : val;
+
+            document.getElementById('targetAmountInput').value = val === undefined ? '' : val;
             document.getElementById('budgetPortionModal').classList.remove('hidden');
         }
 
@@ -9081,24 +9218,26 @@ function resetAllBudgetTargets() {
     showConfirm("รีเซ็ตงบประมาณเดือนนี้?", "ทุกหมวดหมู่ในเดือนนี้จะกลับไปว่างเปล่า", () => {
         const key = getMonthKey();
         
-                if (categoryTargets[key]) {
-                        [...customCategories.spending, ...customCategories.investment].forEach(c => {
+        if (categoryTargets[key]) {
+            [...customCategories.spending, ...customCategories.investment].forEach(c => {
                 delete categoryTargets[key][c.id];
             });
         }
         
-                        
-        localStorage.setItem('fin_targets_v5', JSON.stringify(categoryTargets));
-          hideConfirm();
+
         
-                if (!document.getElementById('settingsModal').classList.contains('hidden')) {
+        localStorage.setItem('fin_targets_v5', JSON.stringify(categoryTargets));
+        hideConfirm();
+        
+        if (!document.getElementById('settingsModal').classList.contains('hidden')) {
             toggleSettingsModal();
         }
         
-                switchPage('overview');
+        switchPage('overview');
         
-                setTimeout(() => {
-            updateBudgetUI();             showToast("✅ รีเซ็ตงบประมาณเดือนนี้ว่างเปล่าสำเร็จ");
+        setTimeout(() => {
+            updateBudgetUI(); 
+            showToast("✅ รีเซ็ตงบประมาณเดือนนี้ว่างเปล่าสำเร็จ");
         }, 300);
     });
 }
@@ -9111,9 +9250,10 @@ function savePortion() {
     
     if (!categoryTargets[k]) categoryTargets[k] = {}; 
     
-        categoryTargets[k][editingCatId] = { 
+    categoryTargets[k][editingCatId] = { 
         value: v,
-        mode: budgetMode     };
+        mode: budgetMode 
+    };
     
     localStorage.setItem('fin_targets_v5', JSON.stringify(categoryTargets)); 
 
@@ -9135,7 +9275,7 @@ function updatePortionModalUnit(mode) {
     
     unitElement.textContent = mode === 'percentage' ? '%' : '฿';
     
-        const c = [...customCategories.spending, ...customCategories.investment].find(x => x.id === editingCatId);
+    const c = [...customCategories.spending, ...customCategories.investment].find(x => x.id === editingCatId);
     const isInvestment = c && customCategories.investment.some(inv => inv.id === c.id);
     
     hintElement.textContent = mode === 'percentage' 
@@ -9146,7 +9286,7 @@ function updatePortionModalUnit(mode) {
 function showToast(message) {
     const toast = document.getElementById('toast');
     
-        if (message.includes("🔄")) {
+    if (message.includes("🔄")) {
         toast.classList.remove('green-toast');
         toast.classList.add('bg-blue-500', 'text-white');
     } else if (message.includes("✅")) {
@@ -9160,7 +9300,7 @@ function showToast(message) {
     toast.style.display = 'block';
     toast.style.opacity = '1';
     
-        setTimeout(() => { 
+    setTimeout(() => { 
         toast.style.opacity = '0';
         setTimeout(() => {
             toast.style.display = 'none';
@@ -9172,7 +9312,7 @@ function showToast(message) {
         function jumpToYear(y) { displayYear = parseInt(y); updateYearlyUI(); if (document.getElementById('y-tab-tags').classList.contains('active')) updateYearlyTagsUI(); }
         function changeDisplayYear(step) { displayYear += step; document.getElementById('yearSelect').value = displayYear; updateYearlyUI(); if (document.getElementById('y-tab-tags').classList.contains('active')) updateYearlyTagsUI(); }
         function setDefaultDate() {
-        if (!editingTxId) {
+    if (!editingTxId) {
         document.getElementById('transDate').value = new Date().toISOString().split('T')[0];
     }
 }
@@ -9185,7 +9325,7 @@ async function exportFullData() {
     try {
         console.log("📤 เริ่ม export ข้อมูลเต็มรูปแบบ...");
         
-                let allTransactions = transactions;
+        let allTransactions = transactions;
         if (financeDB && financeDB.getAllTransactions) {
             try {
                 allTransactions = await financeDB.getAllTransactions();
@@ -9195,7 +9335,7 @@ async function exportFullData() {
             }
         }
         
-                let allAccounts = accounts;
+        let allAccounts = accounts;
         if (financeDB && financeDB.getFromIndexedDB) {
             try {
                 const accountsDoc = await financeDB.getFromIndexedDB('accounts', 'user_accounts');
@@ -9208,21 +9348,21 @@ async function exportFullData() {
             }
         }
         
-                const exportData = {
-                        version: "3.0",
+        const exportData = {
+            version: "3.0",
             exportedAt: new Date().toISOString(),
             appName: "Flow Wallet",
             dataSource: financeDB && financeDB.db ? "IndexedDB + LocalStorage" : "LocalStorage only",
             
-                        transactions: allTransactions,
+            transactions: allTransactions,
             accounts: allAccounts,
             customCategories: customCategories,
             categoryTargets: categoryTargets,
             
-                        debts: debts,
+            debts: debts,
             payments: payments,
             
-                        settings: {
+            settings: {
                 currentAccountId: currentAccountId,
                 accountFilterId: accountFilterId,
                 currentFontSize: currentFontSize,
@@ -9230,7 +9370,7 @@ async function exportFullData() {
                 darkMode: document.body.classList.contains('dark')
             },
             
-                        statistics: {
+            statistics: {
                 totalTransactions: allTransactions.length,
                 totalAccounts: allAccounts.length,
                 totalDebts: debts.length,
@@ -9239,23 +9379,24 @@ async function exportFullData() {
             }
         };
         
-                const jsonString = JSON.stringify(exportData, null, 2);         const blob = new Blob([jsonString], {type: "application/json"});
+        const jsonString = JSON.stringify(exportData, null, 2); 
+        const blob = new Blob([jsonString], {type: "application/json"});
         
-                const link = document.createElement("a");
+        const link = document.createElement("a");
         const url = URL.createObjectURL(blob);
         link.href = url;
         
-                const date = new Date();
+        const date = new Date();
         const timestamp = `${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2,'0')}${date.getDate().toString().padStart(2,'0')}_${date.getHours().toString().padStart(2,'0')}${date.getMinutes().toString().padStart(2,'0')}`;
         link.download = `FlowWallet_Full_Backup_${timestamp}.json`;
         
-                document.body.appendChild(link);
+        document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         
-                setTimeout(() => URL.revokeObjectURL(url), 100);
+        setTimeout(() => URL.revokeObjectURL(url), 100);
         
-                const fileSize = (blob.size / 1024).toFixed(2);
+        const fileSize = (blob.size / 1024).toFixed(2);
         const summary = `
 ✅ Export สำเร็จ!
 • ธุรกรรม: ${allTransactions.length} รายการ
@@ -9275,7 +9416,7 @@ async function exportFullData() {
 }
 function openMobileImportModal() {
     if (isMobile()) {
-                const input = document.createElement('input');
+        const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.json,.JSON';
         input.style.display = 'none';
@@ -9290,9 +9431,9 @@ function openMobileImportModal() {
                 const text = await file.text();
                 const data = JSON.parse(text);
                 
-                                await importFullData(data);
+                await importFullData(data);
                 
-                                document.body.removeChild(input);
+                document.body.removeChild(input);
                 
             } catch (error) {
                 console.error("❌ Import ล้มเหลว:", error);
@@ -9304,7 +9445,7 @@ function openMobileImportModal() {
         input.click();
         
     } else {
-                document.getElementById('restoreFileInput').click();
+        document.getElementById('restoreFileInput').click();
     }
 }
 
@@ -9312,7 +9453,7 @@ async function importFullData(data) {
     try {
         console.log("📥 เริ่ม import ข้อมูล...", data);
         
-                if (!data.version) {
+        if (!data.version) {
             showToast("⚠️ ไฟล์เก่าเกินไป, ใช้วิธี import แบบเก่า");
             return importLegacyData(data);
         }
@@ -9322,10 +9463,10 @@ async function importFullData(data) {
         let importedCount = 0;
         let errorCount = 0;
         
-                if (data.accounts && Array.isArray(data.accounts)) {
+        if (data.accounts && Array.isArray(data.accounts)) {
             console.log(`📥 นำเข้าบัญชี ${data.accounts.length} บัญชี`);
             
-                        data.accounts.forEach(newAccount => {
+            data.accounts.forEach(newAccount => {
                 const exists = accounts.some(acc => acc.id === newAccount.id);
                 if (!exists) {
                     accounts.push(newAccount);
@@ -9337,37 +9478,37 @@ async function importFullData(data) {
             showToast(`✅ นำเข้าบัญชี ${data.accounts.length} บัญชี`);
         }
         
-                if (data.customCategories) {
+        if (data.customCategories) {
             customCategories = data.customCategories;
             localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
             console.log("✅ นำเข้าหมวดหมู่");
         }
         
-                if (data.categoryTargets) {
+        if (data.categoryTargets) {
             categoryTargets = data.categoryTargets;
             localStorage.setItem('fin_targets_v5', JSON.stringify(categoryTargets));
             console.log("✅ นำเข้าเป้าหมายงบประมาณ");
         }
         
-                if (data.transactions && Array.isArray(data.transactions)) {
+        if (data.transactions && Array.isArray(data.transactions)) {
             console.log(`📥 นำเข้า ${data.transactions.length} ธุรกรรม`);
             
             for (let i = 0; i < data.transactions.length; i++) {
                 const tx = data.transactions[i];
                 
                 try {
-                                        if (!tx.id || !tx.amount || !tx.type || !tx.rawDate) {
+                    if (!tx.id || !tx.amount || !tx.type || !tx.rawDate) {
                         console.warn("⚠️ ธุรกรรมไม่สมบูรณ์:", tx);
                         errorCount++;
                         continue;
                     }
                     
-                                        const result = await financeDB.saveTransaction(tx);
+                    const result = await financeDB.saveTransaction(tx);
                     
                     if (result.success) {
                         importedCount++;
                         
-                                                if (isMobile() && i % 10 === 0) {
+                        if (isMobile() && i % 10 === 0) {
                             const percent = Math.round((i / data.transactions.length) * 100);
                             showToast(`กำลังนำเข้า... ${percent}%`);
                         }
@@ -9384,19 +9525,19 @@ async function importFullData(data) {
             console.log(`✅ นำเข้า ${importedCount} ธุรกรรม, ${errorCount} ข้อผิดพลาด`);
         }
         
-                if (data.debts && Array.isArray(data.debts)) {
+        if (data.debts && Array.isArray(data.debts)) {
             debts = data.debts;
             localStorage.setItem('fin_debts', JSON.stringify(debts));
             console.log(`✅ นำเข้า ${debts.length} หนี้`);
         }
         
-                if (data.payments && Array.isArray(data.payments)) {
+        if (data.payments && Array.isArray(data.payments)) {
             payments = data.payments;
             localStorage.setItem('fin_debt_payments', JSON.stringify(payments));
             console.log(`✅ นำเข้า ${payments.length} การชำระ`);
         }
         
-                if (data.settings) {
+        if (data.settings) {
             if (data.settings.currentAccountId) {
                 currentAccountId = data.settings.currentAccountId;
                 localStorage.setItem('fin_current_account', currentAccountId);
@@ -9416,24 +9557,24 @@ async function importFullData(data) {
             console.log("✅ นำเข้าการตั้งค่า");
         }
         
-                setTimeout(() => {
-                        loadInitialData();
+        setTimeout(() => {
+            loadInitialData();
             
-                        updateUI();
+            updateUI();
             updateCategorySelect();
             updateAccountSelect();
             updateAccountFilterDropdown();
             
-                        refreshAnalysisCharts();
+            refreshAnalysisCharts();
             
-                        if (!document.getElementById('page-accounts').classList.contains('hidden')) {
+            if (!document.getElementById('page-accounts').classList.contains('hidden')) {
                 renderAccountsList();
             }
             if (!document.getElementById('page-debt').classList.contains('hidden')) {
                 renderDebtPage();
             }
             
-                        const summary = `
+            const summary = `
 ✅ Import สำเร็จ!
 • ธุรกรรม: ${importedCount} รายการ
 • บัญชี: ${data.accounts?.length || 0} บัญชี
@@ -9443,7 +9584,7 @@ async function importFullData(data) {
             
             showToast(summary);
             
-                        if (isMobile()) {
+            if (isMobile()) {
                 switchPage('overview');
             }
             
@@ -9458,15 +9599,15 @@ async function importFullData(data) {
 function importLegacyData(data) {
     console.log("🔄 นำเข้าไฟล์รูปแบบเก่า");
     
-        transactions = data.transactions || [];
+    transactions = data.transactions || [];
     categoryTargets = data.targets || {};
     customCategories = data.cats || defaultCategories;
     
-        localStorage.setItem('fin_tx_v5', JSON.stringify(transactions.slice(0, 1000)));
+    localStorage.setItem('fin_tx_v5', JSON.stringify(transactions.slice(0, 1000)));
     localStorage.setItem('fin_targets_v5', JSON.stringify(categoryTargets));
     localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
     
-        updateUI();
+    updateUI();
     updateCategorySelect();
     
     showToast("✅ นำเข้าข้อมูลสำเร็จ (ไฟล์รูปแบบเก่า)");
@@ -9477,7 +9618,7 @@ async function resetAllData() {
         try {
             console.log("🔄 เริ่มต้นรีเซ็ตข้อมูลทั้งหมด...");
             
-                        transactions = [];
+            transactions = [];
             categoryTargets = {};
             customCategories = JSON.parse(JSON.stringify(defaultCategories));
             currentDate = new Date();
@@ -9486,12 +9627,15 @@ async function resetAllData() {
             editingCatId = null;
             editingTagName = null;
             selectedIcon = '📁';
-            analysisDate = new Date();             displayYear = new Date().getFullYear();             analysisPeriod = 'month';             
-                        if (financeDB && financeDB.db) {
+            analysisDate = new Date(); 
+            displayYear = new Date().getFullYear(); 
+            analysisPeriod = 'month'; 
+            
+            if (financeDB && financeDB.db) {
                 try {
                     console.log("🗑️ ลบข้อมูลจาก IndexedDB...");
                     
-                                        const storeNames = ['transactions', 'categories', 'budgets', 'metadata'];
+                    const storeNames = ['transactions', 'categories', 'budgets', 'metadata'];
                     for (const storeName of storeNames) {
                         const transaction = financeDB.db.transaction([storeName], 'readwrite');
                         const store = transaction.objectStore(storeName);
@@ -9507,7 +9651,7 @@ async function resetAllData() {
                 }
             }
             
-                        console.log("🗑️ ลบข้อมูลจาก LocalStorage...");
+            console.log("🗑️ ลบข้อมูลจาก LocalStorage...");
             const keysToRemove = [];
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
@@ -9525,18 +9669,20 @@ async function resetAllData() {
             
             console.log(`✅ ลบข้อมูลจาก LocalStorage สำเร็จ: ${keysToRemove.length} รายการ`);
             
-                        sessionStorage.clear();             
-                        if (financeDB && financeDB.removeFromInMemoryTransactions) {
-                financeDB.removeFromInMemoryTransactions = () => {};             }
+            sessionStorage.clear(); 
             
-                        updateMonthDisplay();
+            if (financeDB && financeDB.removeFromInMemoryTransactions) {
+                financeDB.removeFromInMemoryTransactions = () => {}; 
+            }
+            
+            updateMonthDisplay();
             updateCategorySelect();
             setDefaultDate();
             setFontSize('medium', false);
             
-                        const currentPage = getCurrentPage();
+            const currentPage = getCurrentPage();
             
-                        setTimeout(() => {
+            setTimeout(() => {
                 updateUI();
                 renderCalendar();
                 
@@ -9549,9 +9695,9 @@ async function resetAllData() {
                     updateYearlyUI();
                 }
                 
-                                populateYearSelect();
+                populateYearSelect();
                 
-                                hideConfirm();
+                hideConfirm();
                 if (!document.getElementById('settingsModal').classList.contains('hidden')) {
                     toggleSettingsModal();
                 }
@@ -9565,7 +9711,7 @@ async function resetAllData() {
             hideConfirm();
             showToast("❌ รีเซ็ตไม่สำเร็จ: " + error.message);
             
-                        console.error("Debug info:", {
+            console.error("Debug info:", {
                 financeDBReady: !!(financeDB && financeDB.db),
                 localStorageKeys: Array.from({length: localStorage.length}, (_, i) => localStorage.key(i)),
                 memoryTransactionsCount: transactions.length
@@ -9578,8 +9724,8 @@ async function saveCurrentView() {
     try {
         console.log('💾 กำลังบันทึกหน้าต่างปัจจุบัน...');
         
-                const currentView = {
-                        page: getCurrentPage(),
+        const currentView = {
+            page: getCurrentPage(),
             month: currentDate.getMonth(),
             year: currentDate.getFullYear(),
             fontSize: currentFontSize,
@@ -9587,10 +9733,10 @@ async function saveCurrentView() {
             analysisPeriod: analysisPeriod,
             analysisDate: analysisDate.toISOString(),
             displayYear: displayYear,
-                        overviewTab: document.querySelector('#tab-history-btn.text-indigo-600, #tab-history-btn.text-indigo-400, #tab-history-btn.border-indigo-600') ? 'history' : 'calendar',
+            overviewTab: document.querySelector('#tab-history-btn.text-indigo-600, #tab-history-btn.text-indigo-400, #tab-history-btn.border-indigo-600') ? 'history' : 'calendar',
             analysisTab: document.querySelector('.analysis-tab-btn.active')?.id?.replace('a-tab-', '') || 'overview',
             yearlyTab: document.querySelector('.yearly-tab-btn.active')?.id?.replace('y-tab-', '') || 'category',
-                        savedAt: new Date().toISOString(),
+            savedAt: new Date().toISOString(),
             version: '2.0'
         };
         
@@ -9599,7 +9745,7 @@ async function saveCurrentView() {
         let savedToIndexedDB = false;
         let savedToLocalStorage = false;
         
-                if (financeDB && financeDB.db) {
+        if (financeDB && financeDB.db) {
             try {
                 const transaction = financeDB.db.transaction(['metadata'], 'readwrite');
                 const store = transaction.objectStore('metadata');
@@ -9628,7 +9774,7 @@ async function saveCurrentView() {
             }
         }
         
-                try {
+        try {
             localStorage.setItem('fin_current_view', JSON.stringify(currentView));
             savedToLocalStorage = true;
             console.log('✅ บันทึกใน LocalStorage สำเร็จ');
@@ -9636,7 +9782,7 @@ async function saveCurrentView() {
             console.error('❌ LocalStorage error:', lsError);
         }
         
-                let message;
+        let message;
         if (savedToIndexedDB && savedToLocalStorage) {
             message = "💾 บันทึกใน IndexedDB + LocalStorage สำเร็จ";
         } else if (savedToLocalStorage) {
@@ -9674,8 +9820,8 @@ async function loadSavedView() {
         let savedView = null;
         let source = 'none';
         
-                
-                if (financeDB && financeDB.db) {
+        
+        if (financeDB && financeDB.db) {
             try {
                 const transaction = financeDB.db.transaction(['metadata'], 'readonly');
                 const store = transaction.objectStore('metadata');
@@ -9696,7 +9842,7 @@ async function loadSavedView() {
             }
         }
         
-                if (!savedView && financeDB && financeDB.getMetadata) {
+        if (!savedView && financeDB && financeDB.getMetadata) {
             try {
                 const view = await financeDB.getMetadata('current_view');
                 if (view) {
@@ -9709,7 +9855,7 @@ async function loadSavedView() {
             }
         }
         
-                if (!savedView) {
+        if (!savedView) {
             try {
                 const localStorageView = JSON.parse(localStorage.getItem('fin_current_view'));
                 if (localStorageView) {
@@ -9722,7 +9868,7 @@ async function loadSavedView() {
             }
         }
         
-                if (!savedView) {
+        if (!savedView) {
             try {
                 const fallbackView = JSON.parse(localStorage.getItem('fin_current_view_indexeddb_fallback'));
                 if (fallbackView) {
@@ -9763,15 +9909,15 @@ async function loadSavedView() {
             try {
                 let fileContent = event.target.result;
                 
-                                try {
+                try {
                     fileContent = autoFixJSON(fileContent);
                 } catch (fixError) {
                     console.error("❌ ไม่สามารถซ่อม JSON ได้:", fixError);
                     
-                                        const preview = event.target.result.substring(0, 200);
+                    const preview = event.target.result.substring(0, 200);
                     showToast(`❌ ไฟล์ไม่ใช่ JSON ที่ถูกต้อง (ขึ้นต้นด้วย "${preview.substring(0, 20)}")`, 'error');
                     
-                                        if (confirm('ต้องการดูเนื้อหาไฟล์ใน Console เพื่อ debug หรือไม่?')) {
+                    if (confirm('ต้องการดูเนื้อหาไฟล์ใน Console เพื่อ debug หรือไม่?')) {
                         console.log("========== เนื้อหาไฟล์ ==========");
                         console.log(event.target.result);
                         console.log("=================================");
@@ -9781,24 +9927,24 @@ async function loadSavedView() {
                     return;
                 }
                 
-                                const data = JSON.parse(fileContent);
+                const data = JSON.parse(fileContent);
                 
                 console.log("📋 ข้อมูลที่นำเข้า:", data);
                 
-                                if (data.version) {
+                if (data.version) {
                     await importVersionedData(data);
                 } else {
                     await importLegacyJSON(data);
                 }
                 
-                                input.value = '';
+                input.value = '';
                 
             } catch (parseError) {
                 console.error("❌ ไฟล์ไม่ถูกต้อง:", parseError);
                 
-                                showToast(`❌ JSON ไม่ถูกต้อง: ${parseError.message}`, 'error');
+                showToast(`❌ JSON ไม่ถูกต้อง: ${parseError.message}`, 'error');
                 
-                                if (confirm('ต้องการดูเนื้อหาไฟล์ใน Console เพื่อ debug หรือไม่?')) {
+                if (confirm('ต้องการดูเนื้อหาไฟล์ใน Console เพื่อ debug หรือไม่?')) {
                     console.log("========== เนื้อหาไฟล์ ==========");
                     console.log(event.target.result);
                     console.log("=================================");
@@ -9818,7 +9964,7 @@ async function loadSavedView() {
 }
 
 function debugJSONFile() {
-        const input = document.createElement('input');
+    const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json,.JSON';
     input.style.display = 'none';
@@ -9837,21 +9983,21 @@ function debugJSONFile() {
             console.log("ขนาดไฟล์:", file.size, "bytes");
             console.log("ประเภทไฟล์:", file.type);
             
-                        console.log("เนื้อหาทั้งหมด:");
+            console.log("เนื้อหาทั้งหมด:");
             console.log(content);
             
-                        console.log("\nรหัส ASCII 20 ตัวแรก:");
+            console.log("\nรหัส ASCII 20 ตัวแรก:");
             for (let i = 0; i < Math.min(20, content.length); i++) {
                 console.log(`[${i}] '${content[i]}' = ${content.charCodeAt(i)}`);
             }
             
-                        if (content.charCodeAt(0) === 0xFEFF) {
+            if (content.charCodeAt(0) === 0xFEFF) {
                 console.log("✅ พบ BOM (Byte Order Mark) ที่ตำแหน่ง 0");
             } else {
                 console.log("❌ ไม่พบ BOM");
             }
             
-                        const trimmed = content.trim();
+            const trimmed = content.trim();
             console.log("\nหลังจาก trim():", trimmed.substring(0, 100));
             console.log("ขึ้นต้นด้วย:", trimmed.substring(0, 20));
             
@@ -9872,14 +10018,14 @@ function autoFixJSON(content) {
     
     let fixed = content;
     
-        if (fixed.charCodeAt(0) === 0xFEFF) {
+    if (fixed.charCodeAt(0) === 0xFEFF) {
         fixed = fixed.slice(1);
         console.log("✅ ลบ BOM แล้ว");
     }
     
-        fixed = fixed.trim();
+    fixed = fixed.trim();
     
-            const firstBrace = fixed.indexOf('{');
+    const firstBrace = fixed.indexOf('{');
     const firstBracket = fixed.indexOf('[');
     
     if (firstBrace > 0 || firstBracket > 0) {
@@ -9892,7 +10038,7 @@ function autoFixJSON(content) {
         }
     }
     
-        if (!fixed.startsWith('{') && !fixed.startsWith('[')) {
+    if (!fixed.startsWith('{') && !fixed.startsWith('[')) {
         throw new Error('ไม่พบ JSON ในไฟล์');
     }
     
@@ -9906,32 +10052,34 @@ async function importLegacyJSON(oldData) {
         let importedCount = 0;
         let errorCount = 0;
         
-                let oldTransactions = [];
+        let oldTransactions = [];
         
-                if (oldData.data && oldData.data.transactions) {
+        if (oldData.data && oldData.data.transactions) {
             oldTransactions = oldData.data.transactions;
         }
-                else if (oldData.transactions && Array.isArray(oldData.transactions)) {
+        
+        else if (oldData.transactions && Array.isArray(oldData.transactions)) {
             oldTransactions = oldData.transactions;
         }
-                else if (Array.isArray(oldData)) {
+       
+        else if (Array.isArray(oldData)) {
             oldTransactions = oldData;
         }
         
         console.log(`📦 พบ ${oldTransactions.length} transactions ในไฟล์เก่า`);
         
-                for (let i = 0; i < oldTransactions.length; i++) {
+        for (let i = 0; i < oldTransactions.length; i++) {
             try {
                 const oldTx = oldTransactions[i];
                 const newTx = convertLegacyTransaction(oldTx);
                 
                 if (newTx) {
-                                        const result = await financeDB.saveTransaction(newTx);
+                    const result = await financeDB.saveTransaction(newTx);
                     
                     if (result.success) {
                         importedCount++;
                         
-                                                const exists = transactions.some(t => t.id === newTx.id);
+                        const exists = transactions.some(t => t.id === newTx.id);
                         if (!exists) {
                             transactions.unshift(newTx);
                         }
@@ -9942,7 +10090,7 @@ async function importLegacyJSON(oldData) {
                     errorCount++;
                 }
                 
-                                if (i % 10 === 0) {
+                if (i % 10 === 0) {
                     const percent = Math.round((i / oldTransactions.length) * 100);
                     showToast(`🔄 กำลังแปลง... ${percent}%`);
                 }
@@ -9953,7 +10101,7 @@ async function importLegacyJSON(oldData) {
             }
         }
         
-                if (oldData.categories || (oldData.data && oldData.data.categories)) {
+        if (oldData.categories || (oldData.data && oldData.data.categories)) {
             const oldCats = oldData.categories || oldData.data.categories;
             if (oldCats) {
                 customCategories = mergeCategories(customCategories, oldCats);
@@ -9985,7 +10133,7 @@ async function importLegacyJSON(oldData) {
             }
         }
         
-                showToast(`✅ แปลงข้อมูลสำเร็จ! นำเข้า ${importedCount} รายการ, ผิดพลาด ${errorCount} รายการ`, 'success');
+        showToast(`✅ แปลงข้อมูลสำเร็จ! นำเข้า ${importedCount} รายการ, ผิดพลาด ${errorCount} รายการ`, 'success');
         
         setTimeout(() => {
             loadInitialData();
@@ -10012,28 +10160,30 @@ function convertLegacyTransaction(oldTx) {
     try {
         console.log("🔄 แปลง transaction เก่า:", oldTx);
         
-                let id = oldTx.id || oldTx._id || `imported_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        let id = oldTx.id || oldTx._id || `imported_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
-                let rawDate = oldTx.rawDate || oldTx.date || oldTx.createdAt || new Date().toISOString().split('T')[0];
+        let rawDate = oldTx.rawDate || oldTx.date || oldTx.createdAt || new Date().toISOString().split('T')[0];
         if (rawDate.includes('T')) {
-            rawDate = rawDate.split('T')[0];         }
+            rawDate = rawDate.split('T')[0]; 
+        }
         
-                const dateObj = new Date(rawDate);
+        const dateObj = new Date(rawDate);
         const monthKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
         
-                let accountId = oldTx.accountId || oldTx.account_id || null;
+        let accountId = oldTx.accountId || oldTx.account_id || null;
         if (accountId && typeof accountId === 'number') {
-            accountId = accountId.toString();         }
+            accountId = accountId.toString(); 
+        }
         
-                if (!accountId) {
+        if (!accountId) {
             const defaultAccount = accounts.find(a => a.isDefault);
             accountId = defaultAccount ? defaultAccount.id : 'default_acc';
         }
         
-                const owner_type = isLoggedIn ? 'user' : 'guest';
+        const owner_type = isLoggedIn ? 'user' : 'guest';
         const owner_id = isLoggedIn ? currentUser.id : getGuestId();
         
-                const newTx = {
+        const newTx = {
             id: id,
             amount: oldTx.amount || 0,
             type: oldTx.type || 'expense',
@@ -10048,10 +10198,10 @@ function convertLegacyTransaction(oldTx) {
             createdAt: oldTx.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             
-                        owner_type: owner_type,
+            owner_type: owner_type,
             owner_id: owner_id,
             
-                        imported: true,
+            imported: true,
             originalFormat: 'legacy'
         };
         
@@ -10073,15 +10223,15 @@ function mergeCategories(existingCats, oldCats) {
         investment: [...existingCats.investment]
     };
     
-        if (Array.isArray(oldCats)) {
+    if (Array.isArray(oldCats)) {
         oldCats.forEach(cat => {
-                        const catName = cat.label || cat.name || cat;
+            const catName = cat.label || cat.name || cat;
             
-                        const exists = [...result.income, ...result.spending, ...result.investment]
+            const exists = [...result.income, ...result.spending, ...result.investment]
                 .some(c => c.label === catName || c.id === cat.id);
             
             if (!exists && catName) {
-                                result.spending.push({
+                result.spending.push({
                     id: cat.id || `cat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                     label: catName,
                     icon: cat.icon || '📝',
@@ -10091,7 +10241,7 @@ function mergeCategories(existingCats, oldCats) {
         });
     }
     
-        if (oldCats.income && Array.isArray(oldCats.income)) {
+    if (oldCats.income && Array.isArray(oldCats.income)) {
         oldCats.income.forEach(cat => {
             const exists = result.income.some(c => c.label === cat.label || c.id === cat.id);
             if (!exists) {
@@ -10163,16 +10313,16 @@ async function importVersionedData(data) {
         let importedCount = 0;
         let errorCount = 0;
         
-                if (!data.data && !data.transactions) {
+        if (!data.data && !data.transactions) {
             throw new Error("โครงสร้างไฟล์ไม่ถูกต้อง");
         }
         
-                const sourceData = data.data || data;
+        const sourceData = data.data || data;
         
-                if (sourceData.accounts && Array.isArray(sourceData.accounts)) {
+        if (sourceData.accounts && Array.isArray(sourceData.accounts)) {
             console.log(`📥 นำเข้าบัญชี ${sourceData.accounts.length} บัญชี`);
             
-                        sourceData.accounts.forEach(newAccount => {
+            sourceData.accounts.forEach(newAccount => {
                 const exists = accounts.some(acc => acc.id === newAccount.id);
                 if (!exists) {
                     accounts.push(newAccount);
@@ -10183,21 +10333,21 @@ async function importVersionedData(data) {
             showToast(`✅ นำเข้าบัญชี ${sourceData.accounts.length} บัญชี`);
         }
         
-                if (sourceData.categories || sourceData.customCategories) {
+        if (sourceData.categories || sourceData.customCategories) {
             const categories = sourceData.categories || sourceData.customCategories;
             customCategories = categories;
             localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
             console.log("✅ นำเข้าหมวดหมู่");
         }
         
-                if (sourceData.budgets || sourceData.categoryTargets) {
+        if (sourceData.budgets || sourceData.categoryTargets) {
             const budgets = sourceData.budgets || sourceData.categoryTargets;
             categoryTargets = budgets;
             localStorage.setItem('fin_targets_v5', JSON.stringify(categoryTargets));
             console.log("✅ นำเข้าเป้าหมายงบประมาณ");
         }
         
-                const transactionsToImport = sourceData.transactions || [];
+        const transactionsToImport = sourceData.transactions || [];
         if (transactionsToImport.length > 0) {
             console.log(`📥 นำเข้า ${transactionsToImport.length} ธุรกรรม`);
             
@@ -10205,23 +10355,23 @@ async function importVersionedData(data) {
                 const tx = transactionsToImport[i];
                 
                 try {
-                                        if (!tx.id || !tx.amount || !tx.type) {
+                    if (!tx.id || !tx.amount || !tx.type) {
                         console.warn("⚠️ ธุรกรรมไม่สมบูรณ์:", tx);
                         errorCount++;
                         continue;
                     }
                     
-                                        if (!tx.monthKey && tx.rawDate) {
+                    if (!tx.monthKey && tx.rawDate) {
                         const date = new Date(tx.rawDate);
                         tx.monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
                     }
                     
-                                        if (financeDB && financeDB.saveTransaction) {
+                    if (financeDB && financeDB.saveTransaction) {
                         const result = await financeDB.saveTransaction(tx);
                         if (result.success) {
                             importedCount++;
                             
-                                                        if (i % 50 === 0) {
+                            if (i % 50 === 0) {
                                 const percent = Math.round((i / transactionsToImport.length) * 100);
                                 showToast(`กำลังนำเข้า... ${percent}%`);
                             }
@@ -10229,7 +10379,7 @@ async function importVersionedData(data) {
                             errorCount++;
                         }
                     } else {
-                                                const exists = transactions.some(t => t.id === tx.id);
+                        const exists = transactions.some(t => t.id === tx.id);
                         if (!exists) {
                             transactions.unshift(tx);
                             importedCount++;
@@ -10243,19 +10393,19 @@ async function importVersionedData(data) {
             }
         }
         
-                if (sourceData.debts && Array.isArray(sourceData.debts)) {
+        if (sourceData.debts && Array.isArray(sourceData.debts)) {
             debts = sourceData.debts;
             localStorage.setItem('fin_debts', JSON.stringify(debts));
             console.log(`✅ นำเข้า ${debts.length} หนี้`);
         }
         
-                if (sourceData.payments && Array.isArray(sourceData.payments)) {
+        if (sourceData.payments && Array.isArray(sourceData.payments)) {
             payments = sourceData.payments;
             localStorage.setItem('fin_debt_payments', JSON.stringify(payments));
             console.log(`✅ นำเข้า ${payments.length} การชำระ`);
         }
         
-                if (data.settings || sourceData.settings) {
+        if (data.settings || sourceData.settings) {
             const settings = data.settings || sourceData.settings;
             
             if (settings.currentAccountId) {
@@ -10277,32 +10427,32 @@ async function importVersionedData(data) {
             console.log("✅ นำเข้าการตั้งค่า");
         }
         
-                if (transactions.length > 0 && !financeDB) {
+        if (transactions.length > 0 && !financeDB) {
             localStorage.setItem('fin_tx_v5', JSON.stringify(transactions.slice(0, 1000)));
         }
         
-                setTimeout(() => {
-                        if (financeDB && financeDB.loadInitialData) {
+        setTimeout(() => {
+            if (financeDB && financeDB.loadInitialData) {
                 financeDB.loadInitialData();
             } else {
                 loadFromLocalStorageFallback();
             }
             
-                        updateUI();
+            updateUI();
             updateCategorySelect();
             updateAccountSelect();
             updateAccountFilterDropdown();
             
-                        refreshAnalysisCharts();
+            refreshAnalysisCharts();
             
-                        if (!document.getElementById('page-accounts').classList.contains('hidden')) {
+            if (!document.getElementById('page-accounts').classList.contains('hidden')) {
                 renderAccountsList();
             }
             if (!document.getElementById('page-debt').classList.contains('hidden')) {
                 renderDebtPage();
             }
             
-                        const summary = `
+            const summary = `
 ✅ Import สำเร็จ!
 • ธุรกรรม: ${importedCount} รายการ
 • บัญชี: ${sourceData.accounts?.length || 0} บัญชี
@@ -10322,14 +10472,14 @@ async function importVersionedData(data) {
 
 function triggerMobileRestore() {
     if (isMobile()) {
-                const input = document.createElement('input');
+        const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.json,.JSON';
         input.style.display = 'none';
         
         input.onchange = function(e) {
             handleRestoreFile(e.target);
-                        setTimeout(() => {
+            setTimeout(() => {
                 if (input.parentElement) {
                     document.body.removeChild(input);
                 }
@@ -10340,7 +10490,7 @@ function triggerMobileRestore() {
         input.click();
         
     } else {
-                triggerRestore();
+        triggerRestore();
     }
 }
         function renderTagList() {
@@ -10359,7 +10509,7 @@ function triggerMobileRestore() {
         }
         function cancelTagEdit() { editingTagName = null; document.getElementById('tagEditForm').classList.add('hidden'); }
         function deleteTag(name) { showConfirm("ลบประวัติ TAG?", `ชื่อ "${name}" จะหายไปจากทุกรายการ`, () => { transactions.forEach(t => { if (t.tag === name) t.tag = ""; }); localStorage.setItem('fin_tx_v5', JSON.stringify(transactions)); renderTagList(); updateUI(); hideConfirm(); showToast("ลบแล้ว"); }); }
-    
+
 
 
 let sideMenuOpen = false;
@@ -10372,19 +10522,19 @@ function toggleMobileSideMenu() {
     sideMenuOpen = !sideMenuOpen;
     
     if (sideMenuOpen) {
-                sideMenu.classList.remove('hidden');
+        sideMenu.classList.remove('hidden');
         
-                setTimeout(() => {
+        setTimeout(() => {
             sideMenuPanel.style.transform = 'translateX(0)';
             backdrop.style.opacity = '1';
         }, 10);
         
-                document.body.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden';
     } else {
-                sideMenuPanel.style.transform = '-translate-x-full';
+        sideMenuPanel.style.transform = '-translate-x-full';
         backdrop.style.opacity = '0';
         
-                setTimeout(() => {
+        setTimeout(() => {
             sideMenu.classList.add('hidden');
             document.body.style.overflow = 'auto';
         }, 300);
@@ -10412,46 +10562,46 @@ function updateAuthButtons() {
         if (usernameSpan) usernameSpan.textContent = user.username;
         console.log('🔐 Showing logout button for:', user.username);
         
-                updateLocalSaveCheckbox();
+        updateLocalSaveCheckbox();
         
     } else {
         if (loginBtn) loginBtn.classList.remove('hidden');
         if (logoutDiv) logoutDiv.classList.add('hidden');
         
-                updateLocalSaveCheckbox();
+        updateLocalSaveCheckbox();
     }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 App initializing...');
     
-        const savedUser = localStorage.getItem('user');
+    const savedUser = localStorage.getItem('user');
     
     if (savedUser) {
-                currentUser = JSON.parse(savedUser);
+        currentUser = JSON.parse(savedUser);
         isLoggedIn = true;
         
 
         
-                if (typeof loadFromMySQL === 'function') loadFromMySQL();
+        if (typeof loadFromMySQL === 'function') loadFromMySQL();
         if (typeof loadUserData === 'function') loadUserData();
         
     } else {
-                isLoggedIn = false;
+        isLoggedIn = false;
         currentUser = { id: 'guest_' + Date.now() };
         
 
         
-                if (typeof loadFromLocal === 'function') loadFromLocal();
+        if (typeof loadFromLocal === 'function') loadFromLocal();
     }
     
-           updateAuthButtons();
+    updateAuthButtons();
     
-        if (isLoggedIn && typeof loadUserData === 'function') {
+    if (isLoggedIn && typeof loadUserData === 'function') {
         loadUserData();
     }
 
-        document.body.classList.add('dark');
+    document.body.classList.add('dark');
     setFontSize(currentFontSize, false);
     updateMonthDisplay();
     updateCategorySelect();
@@ -10472,13 +10622,13 @@ document.addEventListener('DOMContentLoaded', function() {
     updateAccountSelect();
     updateAccountFilterDropdown();
     
-        if (financeDB) {
+    if (financeDB) {
         financeDB.init().then(() => {
             console.log("✅ FinanceDB พร้อมใช้งานแล้ว");
             
             
 
-                        updateUI();
+            updateUI();
             renderCalendar();
             
             const currentPage = getCurrentPage();
@@ -10516,12 +10666,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }, 1000);
     
-        document.addEventListener('keydown', function(e) {
+    document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
-                        if (isMobile() && !document.getElementById('mobileActionModal').classList.contains('hidden')) {
+            if (isMobile() && !document.getElementById('mobileActionModal').classList.contains('hidden')) {
                 closeMobileActionModal();
             }
-                        if (sideMenuOpen) {
+            if (sideMenuOpen) {
                 closeMobileSideMenu();
             }
         }
@@ -10546,15 +10696,18 @@ function updateSideMenuActive(page) {
         item.classList.remove('bg-indigo-50', 'dark:bg-indigo-900/30', 'text-indigo-600', 'dark:text-indigo-400');
     });
     
-        let selector = '';
+    let selector = '';
     switch(page) {
         case 'overview': selector = '[onclick*="switchPage(\'overview\')"]'; break;
         case 'budget': selector = '[onclick*="switchPage(\'budget\')"]'; break;
         case 'analysis': selector = '[onclick*="switchPage(\'analysis\')"]'; break;
         case 'yearly': selector = '[onclick*="switchPage(\'yearly\')"]'; break;
-        case 'accounts': selector = '[onclick*="switchPage(\'accounts\')"]'; break;         default: return;     }
+        case 'accounts': selector = '[onclick*="switchPage(\'accounts\')"]'; break; 
+        default: return; 
+    }
     
     if (!selector) return; 
+
     const activeItem = document.querySelector(selector);
     if (activeItem) {
         activeItem.classList.add('bg-indigo-50', 'dark:bg-indigo-900/30', 'text-indigo-600', 'dark:text-indigo-400');
@@ -10565,10 +10718,10 @@ const originalSwitchPage = switchPage;
 switchPage = function(page) {
     originalSwitchPage(page);
     
-        setTimeout(() => {
-                updateAccountFilterDropdown();
+    setTimeout(() => {
+        updateAccountFilterDropdown();
         
-                if (page === 'overview') {
+        if (page === 'overview') {
             setTimeout(() => {
                 bindHistoryItemEvents();
             }, 200);
@@ -10590,17 +10743,17 @@ function toggleMobileSideMenu() {
     sideMenuOpen = !sideMenuOpen;
     
     if (sideMenuOpen) {
-                sideMenu.classList.remove('hidden');
+        sideMenu.classList.remove('hidden');
         document.body.classList.add('side-menu-open');
         
-                setTimeout(() => {
+        setTimeout(() => {
             sideMenuPanel.style.transform = 'translateX(0)';
             backdrop.style.opacity = '1';
         }, 10);
         
         document.body.style.overflow = 'hidden';
     } else {
-                sideMenuPanel.style.transform = '-translate-x-full';
+        sideMenuPanel.style.transform = '-translate-x-full';
         backdrop.style.opacity = '0';
         document.body.classList.remove('side-menu-open');
         
@@ -10616,11 +10769,11 @@ function openMobileSettingsModal() {
 }
 
 function closeMobileSettingsModal() {
-        document.getElementById('mobileSettingsModal').classList.add('hidden');
+    document.getElementById('mobileSettingsModal').classList.add('hidden');
     document.getElementById('settingsModal').classList.add('hidden');
     
     
-        
+    
         switchPage('overview');
     
 }
@@ -10630,15 +10783,17 @@ function closeMobileSettingsModal() {
 
 function formatThaiDate(dateString) {
     const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, '0');     const month = String(date.getMonth() + 1).padStart(2, '0');     const year = date.getFullYear();
+    const day = String(date.getDate()).padStart(2, '0'); 
+    const month = String(date.getMonth() + 1).padStart(2, '0'); 
+    const year = date.getFullYear();
     
     return `${day}/${month}/${year}`;
-    }
+}
 
 function updateMobileDateDisplay() {
     const displayElement = document.getElementById('mobileDateDisplay');
     if (displayElement) {
-                displayElement.textContent = formatThaiDate(mobileFormState.date);
+        displayElement.textContent = formatThaiDate(mobileFormState.date);
     }
 }
 
@@ -10646,13 +10801,13 @@ function updateMobileTagSuggestions() {
     const container = document.getElementById('mobileTagSuggestions');
     if (!container) return;
     
-        const category = mobileFormState.categoryLabel;
+    const category = mobileFormState.categoryLabel;
     if (!category) {
         container.innerHTML = '';
         return;
     }
     
-        const tagCounts = {};
+    const tagCounts = {};
     transactions.forEach(t => {
         if (t.category === category && t.tag && t.tag.trim() !== '') {
             const tag = t.tag.trim();
@@ -10660,15 +10815,16 @@ function updateMobileTagSuggestions() {
         }
     });
     
-        const sortedTags = Object.keys(tagCounts)
+    const sortedTags = Object.keys(tagCounts)
         .sort((a, b) => tagCounts[b] - tagCounts[a])
-        .slice(0, 15);     
+        .slice(0, 15); 
+    
     if (sortedTags.length === 0) {
         container.innerHTML = '';
         return;
     }
     
-        container.innerHTML = sortedTags.map(tag => `
+    container.innerHTML = sortedTags.map(tag => `
         <span onclick="selectMobileTag('${tag}')" 
               class="px-2 py-1 bg-indigo-100 text-indigo-600 text-[10px] font-bold rounded-lg cursor-pointer">
             #${tag}
@@ -10685,18 +10841,20 @@ function selectMobileTag(tag) {
 }
 
 function showLoadingModal() {
-        const toast = document.getElementById('toast');
+    const toast = document.getElementById('toast');
     toast.innerText = '🔄 กำลังโหลดข้อมูล...';
     toast.style.display = 'block';
     toast.style.opacity = '1';
-    toast.style.backgroundColor = '#3b82f6'; }
+    toast.style.backgroundColor = '#3b82f6'; 
+}
 
 function closeLoadingModal() {
     const toast = document.getElementById('toast');
     toast.style.opacity = '0';
     setTimeout(() => {
         toast.style.display = 'none';
-        toast.style.backgroundColor = '';     }, 300);
+        toast.style.backgroundColor = ''; 
+    }, 300);
 }
 
 async function refreshAppData() {
@@ -10707,20 +10865,20 @@ async function refreshAppData() {
     
     isRefreshing = true;
     
-        toggleSettingsModal();
+    toggleSettingsModal();
     
-        showLoadingModal();
+    showLoadingModal();
     
     try {
         console.log("🔄 เริ่มโหลดข้อมูลใหม่...");
         
-                const latestTransactions = await financeDB.getAllTransactions();
+        const latestTransactions = await financeDB.getAllTransactions();
         
-                transactions = latestTransactions;
+        transactions = latestTransactions;
         
         console.log(`✅ โหลดข้อมูลสำเร็จ: ${transactions.length} รายการ (ทุกเดือน)`);
         
-                const currentPage = getCurrentPage();
+        const currentPage = getCurrentPage();
         
         switch(currentPage) {
             case 'overview':
@@ -10753,7 +10911,7 @@ async function refreshAppData() {
         console.error("❌ เกิดข้อผิดพลาดในการโหลด:", error);
         showToast("❌ โหลดข้อมูลไม่สำเร็จ: " + error.message);
     } finally {
-                closeLoadingModal();
+        closeLoadingModal();
         isRefreshing = false;
     }
 }
@@ -10762,7 +10920,7 @@ async function refreshAppData() {
 function initTransferForm() {
     console.log("🔄 initTransferForm() ถูกเรียก");
     
-        const fromSelect = document.getElementById('transferFromAccount');
+    const fromSelect = document.getElementById('transferFromAccount');
     const toSelect = document.getElementById('transferToAccount');
     const amountInput = document.getElementById('transferAmount');
     
@@ -10772,20 +10930,20 @@ function initTransferForm() {
         return;
     }
     
-        updateTransferAccountSelects();
+    updateTransferAccountSelects();
     
-        loadTransferHistory();
+    loadTransferHistory();
     
-        fromSelect.value = "";
+    fromSelect.value = "";
     toSelect.value = "";
     amountInput.value = "";
     
-        document.getElementById('fromAccountBalance').innerHTML = 
+    document.getElementById('fromAccountBalance').innerHTML = 
         `<span class="text-slate-400">ยอดคงเหลือ: --</span>`;
     document.getElementById('toAccountBalance').innerHTML = 
         `<span class="text-slate-400">ยอดคงเหลือ: --</span>`;
     
-        createTransferTypeUI();
+    createTransferTypeUI();
     
     console.log("✅ initTransferForm() เสร็จสิ้น");
 }
@@ -10794,11 +10952,11 @@ function createTransferTypeUI() {
     const transferForm = document.getElementById('transferForm');
     if (!transferForm) return;
     
-        if (document.getElementById('transferTypeContainer')) {
+    if (document.getElementById('transferTypeContainer')) {
         return;
     }
     
-        const typeHTML = `
+    const typeHTML = `
         <!-- Transfer Type Selection -->
         <div id="transferTypeContainer" class="space-y-3 mt-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
             <h4 class="font-bold text-base dark:text-white mb-3 flex items-center gap-2">
@@ -10848,11 +11006,11 @@ function createTransferTypeUI() {
         </div>
     `;
     
-        const transferButton = transferForm.querySelector('button[onclick="transferBetweenAccounts()"]');
+    const transferButton = transferForm.querySelector('button[onclick="transferBetweenAccounts()"]');
     if (transferButton) {
         transferButton.insertAdjacentHTML('beforebegin', typeHTML);
     } else {
-                transferForm.insertAdjacentHTML('beforeend', typeHTML);
+        transferForm.insertAdjacentHTML('beforeend', typeHTML);
     }
 }
 
@@ -10880,7 +11038,7 @@ function updateTransferAccountSelects() {
     if (!fromSelect || !toSelect) {
         console.error("❌ ไม่พบ element transferFromAccount หรือ transferToAccount");
         
-                setTimeout(() => {
+        setTimeout(() => {
             console.log("🔄 ลองเรียก updateTransferAccountSelects() อีกครั้ง...");
             updateTransferAccountSelects();
         }, 500);
@@ -10890,7 +11048,7 @@ function updateTransferAccountSelects() {
     if (accounts.length === 0) {
         console.warn("⚠️ ไม่มีข้อมูลบัญชี, จะลองอีกครั้งเมื่อมีบัญชี");
         
-                setTimeout(() => {
+        setTimeout(() => {
             if (accounts.length > 0) {
                 updateTransferAccountSelects();
             }
@@ -10898,42 +11056,42 @@ function updateTransferAccountSelects() {
         return;
     }
     
-        const currentFromValue = fromSelect.value;
+    const currentFromValue = fromSelect.value;
     const currentToValue = toSelect.value;
     
     console.log("📌 currentFromValue:", currentFromValue);
     console.log("📌 currentToValue:", currentToValue);
     
-        let fromOptions = '<option value="">-- เลือกบัญชีต้นทาง --</option>';
+    let fromOptions = '<option value="">-- เลือกบัญชีต้นทาง --</option>';
     let toOptions = '<option value="">-- เลือกบัญชีปลายทาง --</option>';
     
-        accounts.forEach(acc => {
+    accounts.forEach(acc => {
         const balance = getAccountBalance(acc.id);
         const selected = (acc.id === currentFromValue) ? 'selected' : '';
         fromOptions += `<option value="${acc.id}" ${selected}>${acc.icon} ${acc.name} (฿${balance.toLocaleString()})</option>`;
     });
     
-        accounts.forEach(acc => {
+    accounts.forEach(acc => {
         const balance = getAccountBalance(acc.id);
         const selected = (acc.id === currentToValue) ? 'selected' : '';
         toOptions += `<option value="${acc.id}" ${selected}>${acc.icon} ${acc.name} (฿${balance.toLocaleString()})</option>`;
     });
     
-        fromSelect.innerHTML = fromOptions;
+    fromSelect.innerHTML = fromOptions;
     toSelect.innerHTML = toOptions;
     
     console.log("✅ fromSelect options:", fromSelect.options.length);
     console.log("✅ toSelect options:", toSelect.options.length);
     
-        fromSelect.removeEventListener('change', handleFromSelectChange);
+    fromSelect.removeEventListener('change', handleFromSelectChange);
     toSelect.removeEventListener('change', handleToSelectChange);
     
-        fromSelect.addEventListener('change', handleFromSelectChange);
+    fromSelect.addEventListener('change', handleFromSelectChange);
     toSelect.addEventListener('change', handleToSelectChange);
     
-        updateTransferBalanceDisplays();
+    updateTransferBalanceDisplays();
     
-        if (fromSelect.value) {
+    if (fromSelect.value) {
         handleFromSelectChange.call(fromSelect);
     }
 }
@@ -10949,9 +11107,9 @@ function updateToSelectDropdown(excludeAccountId) {
     
     const currentValue = toSelect.value;
     
-        let optionsHTML = '<option value="">-- เลือกบัญชีปลายทาง --</option>';
+    let optionsHTML = '<option value="">-- เลือกบัญชีปลายทาง --</option>';
     
-        const filteredAccounts = excludeAccountId 
+    const filteredAccounts = excludeAccountId 
         ? accounts.filter(acc => acc.id !== excludeAccountId)
         : accounts;
     
@@ -10967,7 +11125,7 @@ function updateToSelectDropdown(excludeAccountId) {
     
     console.log("✅ toSelect updated, options:", toSelect.options.length);
     
-        if (currentValue && filteredAccounts.some(acc => acc.id === currentValue)) {
+    if (currentValue && filteredAccounts.some(acc => acc.id === currentValue)) {
         toSelect.value = currentValue;
         console.log("📌 toSelect value restored to:", currentValue);
     }
@@ -10978,16 +11136,17 @@ function handleFromSelectChange() {
     const toSelect = document.getElementById('transferToAccount');
     
     if (!fromId) {
-                        updateToSelectDropdown("");         return;
+        updateToSelectDropdown(""); 
+        return;
     }
     
-        updateToSelectDropdown(fromId);
+    updateToSelectDropdown(fromId);
     
-        if (toSelect.value === fromId) {
+    if (toSelect.value === fromId) {
         toSelect.value = "";
     }
     
-        updateTransferBalanceDisplays();
+    updateTransferBalanceDisplays();
 }
 
 function handleToSelectChange() {
@@ -11027,7 +11186,7 @@ async function transferBetweenAccounts() {
     const transactionId = 'transfer_' + Date.now();
     const now = new Date().toISOString().split('T')[0];
     const currentMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
-        if (!fromId) {
+    if (!fromId) {
         showToast("กรุณาเลือกบัญชีต้นทาง");
         return;
     }
@@ -11048,15 +11207,15 @@ async function transferBetweenAccounts() {
         return;
     }
     
-        if (transferType === 'as_income' && !incomeCategory) {
+    if (transferType === 'as_income' && !incomeCategory) {
         showToast("กรุณาเลือกหมวดหมู่รายรับ");
         return;
     }
 
-            const fromAccount = getAccountById(fromId);
+    const fromAccount = getAccountById(fromId);
     const toAccount = getAccountById(toId);
     
-        if (!fromAccount || !toAccount) {
+    if (!fromAccount || !toAccount) {
         showToast("ไม่พบข้อมูลบัญชี");
         return;
     }
@@ -11066,7 +11225,8 @@ const transferTransaction = {
     amount: amount,
     type: 'transfer',
     transferType: transferType,
-    transferAsIncome: false,      category: transferType === 'as_income' ? incomeCategory : 'โอนเงิน',
+    transferAsIncome: false,  
+    category: transferType === 'as_income' ? incomeCategory : 'โอนเงิน',
     icon: transferType === 'as_income' ? '💰' : '🔄',
     desc: transferType === 'as_income' 
         ? `โอนไป ${toAccount.name} (${incomeCategory})`
@@ -11075,7 +11235,9 @@ const transferTransaction = {
     rawDate: now,
     monthKey: currentMonthKey,
     date: now,
-    accountId: fromId,               transferToAccountId: toId,        accountId: fromId,
+    accountId: fromId,          
+    transferToAccountId: toId,    
+    accountId: fromId,
     transferToAccountId: toId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -11085,7 +11247,7 @@ const transferTransaction = {
         const result = await financeDB.saveTransaction(transferTransaction);
         
         if (result.success) {
-                        if (transferType === 'as_income') {
+            if (transferType === 'as_income') {
                 const receiveTransactionId = 'transfer_receive_' + Date.now();
 const receiveTransaction = {
     id: receiveTransactionId,
@@ -11101,7 +11263,8 @@ const receiveTransaction = {
     date: now,
     accountId: toId,
     transferFromAccountId: fromId,
-    isTransferIncome: true,      originalTransferId: transactionId,
+    isTransferIncome: true,  
+    originalTransferId: transactionId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
 };
@@ -11110,24 +11273,25 @@ const receiveTransaction = {
                 console.log('✅ บันทึก transaction ฝั่งรับเป็นรายรับสำเร็จ');
             }
             
-                        try {
+         
+            try {
                 const reloadMonthKey = getMonthKey();
                 transactions = await financeDB.getTransactionsByMonth(reloadMonthKey);
                 console.log('✅ โหลด transactions ใหม่:', transactions.length, 'รายการ');
             } catch (dbError) {
                 console.error('Failed to reload from DB:', dbError);
-                                const exists = transactions.some(t => t.id === transferTransaction.id);
+                const exists = transactions.some(t => t.id === transferTransaction.id);
                 if (!exists) {
                     transactions.unshift(transferTransaction);
                 }
             }
             
-                        document.getElementById('transferAmount').value = '';
+            document.getElementById('transferAmount').value = '';
             updateTransferBalanceDisplays();
             loadTransferHistory();
             renderAccountsList();
             
-                        updateUI();
+            updateUI();
             refreshAnalysisCharts();
             
             showToast(`✅ โอนเงินสำเร็จ ฿${amount.toLocaleString()} ${transferType === 'as_income' ? '(นับเป็นรายรับ)' : ''}`);
@@ -11149,10 +11313,12 @@ function loadTransferHistory() {
 const transfers = transactions
     .filter(t => t.type === 'transfer' || (t.type === 'income' && t.isTransferIncome))
         .sort((a, b) => {
-                        const dateA = new Date(a.createdAt || a.rawDate || a.date);
+            const dateA = new Date(a.createdAt || a.rawDate || a.date);
             const dateB = new Date(b.createdAt || b.rawDate || b.date);
-            return dateB - dateA;         })
-        .slice(0, 20);     
+            return dateB - dateA; 
+        })
+        .slice(0, 20); ฃ
+    
     if (transfers.length === 0) {
         document.getElementById('transferHistory').classList.add('hidden');
         return;
@@ -11162,9 +11328,13 @@ const transfers = transactions
     
     container.innerHTML = transfers.map(t => {
         const fromAccount = t.type === 'income' && t.isTransferIncome 
-            ? getAccountById(t.transferFromAccountId || t.accountId)              : getAccountById(t.accountId);          
+            ? getAccountById(t.transferFromAccountId || t.accountId)  
+            : getAccountById(t.accountId);  
+        
         const toAccount = t.type === 'income' && t.isTransferIncome 
-            ? getAccountById(t.accountId)              : getAccountById(t.transferToAccountId || t.accountId);          const date = new Date(t.rawDate);
+            ? getAccountById(t.accountId)  
+            : getAccountById(t.transferToAccountId || t.accountId); 
+        const date = new Date(t.rawDate);
         const dateStr = `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
         
         return `
@@ -11190,17 +11360,18 @@ const transfers = transactions
 
 
 function openImportCSVModal() {
-        toggleSettingsModal();
+    toggleSettingsModal();
     
-        document.getElementById('csvReplaceData').checked = false;
+    document.getElementById('csvReplaceData').checked = false;
     document.getElementById('csvSkipDuplicates').checked = true;
     document.getElementById('csvImportCategories').checked = true;
     document.getElementById('csvFileName').textContent = '';
     document.getElementById('csvImportProgress').classList.add('hidden');
     document.getElementById('processCSVBtn').disabled = true;
     
-        const fileInput = document.getElementById('csvFileUpload');
-    fileInput.value = '';     fileInput.onchange = function(e) {
+    const fileInput = document.getElementById('csvFileUpload');
+    fileInput.value = ''; 
+    fileInput.onchange = function(e) {
         if (e.target.files.length > 0) {
             const fileName = e.target.files[0].name;
             document.getElementById('csvFileName').textContent = `ไฟล์: ${fileName}`;
@@ -11208,7 +11379,7 @@ function openImportCSVModal() {
         }
     };
     
-        document.getElementById('importCSVModal').classList.remove('hidden');
+    document.getElementById('importCSVModal').classList.remove('hidden');
 }
 
 function closeImportCSVModal() {
@@ -11223,18 +11394,18 @@ async function exportToCSV() {
     try {
         console.log("📤 เริ่ม Export ข้อมูลเป็น CSV...");
         
-                toggleSettingsModal();
+        toggleSettingsModal();
         
-                const allTransactions = await financeDB.getAllTransactions();
+        const allTransactions = await financeDB.getAllTransactions();
         
         if (allTransactions.length === 0) {
             showToast("ไม่มีข้อมูลสำหรับ Export");
             return;
         }
         
-                const csvData = prepareCSVData(allTransactions);
+        const csvData = prepareCSVData(allTransactions);
         
-                const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         
@@ -11256,7 +11427,7 @@ async function exportToCSV() {
 }
 
 function prepareCSVData(transactions) {
-        const headers = [
+    const headers = [
         'วันที่',
         'ประเภท',
         'หมวดหมู่',
@@ -11270,7 +11441,7 @@ function prepareCSVData(transactions) {
         'อัปเดตล่าสุด'
     ];
     
-        const rows = transactions.map(t => {
+    const rows = transactions.map(t => {
         const date = new Date(t.rawDate || t.date);
         const month = date.getMonth() + 1;
         const year = date.getFullYear();
@@ -11290,11 +11461,11 @@ function prepareCSVData(transactions) {
         ];
     });
     
-        const csvArray = [headers, ...rows];
+    const csvArray = [headers, ...rows];
     
-        return csvArray.map(row => 
+    return csvArray.map(row => 
         row.map(cell => {
-                        if (typeof cell === 'string' && cell.includes(',')) {
+            if (typeof cell === 'string' && cell.includes(',')) {
                 return `"${cell}"`;
             }
             return cell;
@@ -11325,7 +11496,7 @@ function downloadCSVTemplate() {
         'หมายเหตุ'
     ];
     
-        const exampleData = [
+    const exampleData = [
         ['2024-01-15', 'income', 'เงินเดือน', '30000', 'เงินเดือนประจำเดือน', 'งาน', 'acc_123', ''],
         ['2024-01-16', 'expense', 'กิน', '150', 'อาหารกลางวัน', 'อาหาร', 'acc_123', 'ร้านข้าวแกง'],
         ['2024-01-17', 'expense', 'น้ำมัน', '500', 'เติมน้ำมัน', 'รถ', 'acc_123', 'PTT'],
@@ -11333,12 +11504,12 @@ function downloadCSVTemplate() {
         ['2024-01-19', 'expense', 'สังคม', '300', 'ดูหนังกับเพื่อน', 'บันเทิง', 'acc_123', 'SF Cinema']
     ];
     
-        const csvArray = [templateHeaders, ...exampleData];
+    const csvArray = [templateHeaders, ...exampleData];
     const csvContent = csvArray.map(row => 
         row.map(cell => `"${cell}"`).join(',')
     ).join('\n');
     
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     
@@ -11362,11 +11533,11 @@ async function processCSVImport() {
         return;
     }
     
-        const replaceData = document.getElementById('csvReplaceData').checked;
+    const replaceData = document.getElementById('csvReplaceData').checked;
     const skipDuplicates = document.getElementById('csvSkipDuplicates').checked;
     const importCategories = document.getElementById('csvImportCategories').checked;
     
-        document.getElementById('csvImportProgress').classList.remove('hidden');
+    document.getElementById('csvImportProgress').classList.remove('hidden');
     document.getElementById('processCSVBtn').disabled = true;
     updateCSVProgress(0, 'กำลังอ่านไฟล์...');
     
@@ -11386,19 +11557,19 @@ async function processCSVImport() {
                 
                 updateCSVProgress(10, `พบ ${transactions.length} รายการ`);
                 
-                                const validationResult = validateCSVData(transactions);
+                const validationResult = validateCSVData(transactions);
                 if (!validationResult.valid) {
                     updateCSVProgress(100, 'ข้อมูลไม่ถูกต้อง');
                     showToast(`❌ ข้อมูลไม่ถูกต้อง: ${validationResult.error}`);
                     return;
                 }
                 
-                                if (replaceData) {
+                if (replaceData) {
                     transactions.forEach(t => {
                         t.id = `csv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                     });
                     
-                                        const currentTransactions = await financeDB.getAllTransactions();
+                    const currentTransactions = await financeDB.getAllTransactions();
                     for (const tx of currentTransactions) {
                         await financeDB.deleteTransaction(tx.id);
                     }
@@ -11407,7 +11578,7 @@ async function processCSVImport() {
                     updateCSVProgress(30, 'ล้างข้อมูลเดิมแล้ว');
                 }
                 
-                                let importedCount = 0;
+                let importedCount = 0;
                 let skippedCount = 0;
                 let errorCount = 0;
                 
@@ -11416,7 +11587,7 @@ async function processCSVImport() {
                     const progress = Math.floor(((i + 1) / transactions.length) * 100);
                     
                     try {
-                                                if (skipDuplicates) {
+                        if (skipDuplicates) {
                             const existing = await checkDuplicateTransaction(tx);
                             if (existing) {
                                 skippedCount++;
@@ -11425,15 +11596,15 @@ async function processCSVImport() {
                             }
                         }
                         
-                                                if (tx.accountId && !getAccountById(tx.accountId)) {
+                        if (tx.accountId && !getAccountById(tx.accountId)) {
                             await createAccountFromCSV(tx.accountId);
                         }
                         
-                                                const result = await financeDB.saveTransaction(tx);
+                        const result = await financeDB.saveTransaction(tx);
                         
                         if (result.success) {
                             importedCount++;
-                                                        const existsInMemory = transactions.some(t => t.id === tx.id);
+                            const existsInMemory = transactions.some(t => t.id === tx.id);
                             if (!existsInMemory) {
                                 transactions.unshift(tx);
                             }
@@ -11449,19 +11620,19 @@ async function processCSVImport() {
                     }
                 }
                 
-                                if (importCategories) {
+                if (importCategories) {
                     updateCategoriesFromCSV(transactions);
                 }
                 
-                                updateUI();
+                updateUI();
                 refreshAnalysisCharts();
                 
-                                updateCSVProgress(100, 'นำเข้าสำเร็จ!');
+                updateCSVProgress(100, 'นำเข้าสำเร็จ!');
                 
                 const summary = `นำเข้า: ${importedCount}, ข้าม: ${skippedCount}, ข้อผิดพลาด: ${errorCount}`;
                 showToast(`✅ Import สำเร็จ! ${summary}`);
                 
-                                setTimeout(() => {
+                setTimeout(() => {
                     closeImportCSVModal();
                 }, 2000);
                 
@@ -11496,28 +11667,28 @@ function parseCSVData(csvText) {
     const transactions = [];
     const lines = csvText.split('\n').filter(line => line.trim() !== '');
     
-        if (lines.length === 0) return [];
+    if (lines.length === 0) return [];
     
-        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
     const dataLines = lines.slice(1);
     
     dataLines.forEach((line, index) => {
         try {
-                        const rowData = parseCSVRow(line);
+            const rowData = parseCSVRow(line);
             
             if (rowData.length < headers.length) {
                 console.warn(`⚠️ แถว ${index + 1}: ข้อมูลไม่ครบ`, rowData);
                 return;
             }
             
-                        const tx = {};
+            const tx = {};
             headers.forEach((header, i) => {
                 if (rowData[i] !== undefined) {
                     tx[header] = rowData[i].trim();
                 }
             });
             
-                        const formattedTx = formatTransactionFromCSV(tx);
+            const formattedTx = formatTransactionFromCSV(tx);
             if (formattedTx) {
                 transactions.push(formattedTx);
             }
@@ -11577,7 +11748,7 @@ function formatTransactionFromCSV(csvRow) {
         const desc = csvRow['คำอธิบาย'] || csvRow['Description'] || category;
         const tag = csvRow['TAG'] || csvRow['Tag'] || '';
         
-                const allCats = [
+        const allCats = [
             ...customCategories.income,
             ...customCategories.spending,
             ...customCategories.investment
@@ -11585,9 +11756,9 @@ function formatTransactionFromCSV(csvRow) {
         const catInfo = allCats.find(c => c.label === category);
         const icon = catInfo ? catInfo.icon : '📝';
         
-                let accountId = csvRow['บัญชี'] || csvRow['Account'] || currentAccountId;
+        let accountId = csvRow['บัญชี'] || csvRow['Account'] || currentAccountId;
         if (accountId && !getAccountById(accountId)) {
-                        accountId = currentAccountId;
+            accountId = currentAccountId;
         }
         
         return {
@@ -11648,7 +11819,7 @@ function validateCSVData(transactions) {
 
 async function checkDuplicateTransaction(tx) {
     try {
-                const duplicate = transactions.find(t => 
+        const duplicate = transactions.find(t => 
             t.rawDate === tx.rawDate &&
             t.amount === tx.amount &&
             t.category === tx.category &&
@@ -11694,7 +11865,7 @@ function updateCategoriesFromCSV(transactions) {
             .some(c => c.label === tx.category);
         
         if (!categoryExists && tx.category) {
-                        newCategories.spending.push({
+            newCategories.spending.push({
                 id: `cat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 label: tx.category,
                 icon: '📝',
@@ -11703,10 +11874,10 @@ function updateCategoriesFromCSV(transactions) {
         }
     });
     
-        customCategories = newCategories;
+    customCategories = newCategories;
     localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
     
-        updateCategorySelect();
+    updateCategorySelect();
     
     console.log(`✅ อัพเดตหมวดหมู่จาก CSV สำเร็จ`);
 }
@@ -11714,9 +11885,9 @@ function updateCategoriesFromCSV(transactions) {
 
 async function generatePDFReport() {
     try {
-                toggleSettingsModal();
+        toggleSettingsModal();
         
-                showToast("🔄 กำลังสร้างรายงาน PDF...");
+        showToast("🔄 กำลังสร้างรายงาน PDF...");
         
         
         await createHTMLReport();
@@ -11729,7 +11900,8 @@ async function generatePDFReport() {
 
 async function createHTMLReport() {
     const reportData = await gatherReportData();
-    const htmlContent = createPDFHTML(reportData);      await downloadHTMLFile(htmlContent, reportData);
+    const htmlContent = createPDFHTML(reportData);  
+    await downloadHTMLFile(htmlContent, reportData);
 }
 
 async function downloadHTMLFile(htmlContent, data) {
@@ -11747,13 +11919,13 @@ async function downloadHTMLFile(htmlContent, data) {
 }
 
 function generateChartColors(count) {
-        const mainColors = [
+    const mainColors = [
         '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
         '#FF9F40', '#8AC926', '#1982C4', '#6A4C93', '#F15BB5',
         '#00BBF9', '#00F5D4', '#FF9E00', '#9B5DE5', '#00F5D4'
     ];
     
-        const secondaryColors = [
+    const secondaryColors = [
         '#A663CC', '#B8F2E6', '#FAF3DD', '#C8B8DB', '#B5EAD7',
         '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#FFB7B2',
         '#FF9AA2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA'
@@ -11761,11 +11933,11 @@ function generateChartColors(count) {
     
     const result = [];
     
-        for (let i = 0; i < count; i++) {
+    for (let i = 0; i < count; i++) {
         if (i < mainColors.length) {
             result.push(mainColors[i]);
         } else {
-                        result.push(secondaryColors[(i - mainColors.length) % secondaryColors.length]);
+            result.push(secondaryColors[(i - mainColors.length) % secondaryColors.length]);
         }
     }
     
@@ -11778,9 +11950,9 @@ async function gatherReportData() {
     const currentYear = currentDate.getFullYear();
     const monthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
     
-        const transactions = await financeDB.getTransactionsByMonth(monthKey);
+    const transactions = await financeDB.getTransactionsByMonth(monthKey);
     
-        const income = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const income = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const expense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
     const balance = income - expense;
     const investmentExpense = transactions
@@ -11790,13 +11962,13 @@ async function gatherReportData() {
 
 const investmentRate = income > 0 ? (investmentExpense / income) * 100 : 0;
     
-        const accountsBalance = accounts.map(acc => ({
+    const accountsBalance = accounts.map(acc => ({
         name: acc.name,
         balance: getAccountBalance(acc.id),
         icon: acc.icon
     }));
     
-        const spendingByCategory = {};
+    const spendingByCategory = {};
     const expenseTransactions = transactions.filter(t => t.type === 'expense');
     
     expenseTransactions.forEach(t => {
@@ -11812,7 +11984,7 @@ const investmentRate = income > 0 ? (investmentExpense / income) * 100 : 0;
         spendingByCategory[t.category].count++;
     });
     
-        Object.keys(spendingByCategory).forEach(category => {
+    Object.keys(spendingByCategory).forEach(category => {
         spendingByCategory[category].percentage = expense > 0 ? 
             (spendingByCategory[category].amount / expense) * 100 : 0;
     });
@@ -11822,8 +11994,9 @@ const investmentRate = income > 0 ? (investmentExpense / income) * 100 : 0;
             category, 
             ...data 
         }))
-        .sort((a, b) => b.amount - a.amount);      
-        const spendingByTag = {};
+        .sort((a, b) => b.amount - a.amount);  
+    
+    const spendingByTag = {};
     const taggedTransactions = expenseTransactions.filter(t => t.tag && t.tag.trim() !== '');
     
     taggedTransactions.forEach(t => {
@@ -11839,7 +12012,7 @@ const investmentRate = income > 0 ? (investmentExpense / income) * 100 : 0;
         spendingByTag[tag].count++;
     });
     
-        Object.keys(spendingByTag).forEach(tag => {
+    Object.keys(spendingByTag).forEach(tag => {
         spendingByTag[tag].percentage = expense > 0 ? 
             (spendingByTag[tag].amount / expense) * 100 : 0;
     });
@@ -11850,11 +12023,13 @@ const investmentRate = income > 0 ? (investmentExpense / income) * 100 : 0;
             ...data 
         }))
         .sort((a, b) => b.amount - a.amount);  
+
     const debtData = await getDebtReportData(currentYear);
 const categoryPieData = {
     labels: allCategories.map(cat => cat.category),
     data: allCategories.map(cat => cat.amount),
-    colors: generateChartColors(allCategories.length) };
+    colors: generateChartColors(allCategories.length) 
+};
 
 const tagPieData = {
     labels: allTags.map(tag => tag.tag),
@@ -11863,11 +12038,11 @@ const tagPieData = {
 };
 
     return {
-                month: monthFullNames[currentMonth],
+        month: monthFullNames[currentMonth],
         year: currentYear,
         reportDate: new Date().toLocaleDateString('th-TH'),
         
-                income,
+        income,
         expense,
         balance,
         investmentRate: investmentRate.toFixed(1),
@@ -11878,11 +12053,13 @@ const tagPieData = {
         categoryPieData: categoryPieData,
         tagPieData: tagPieData,
         
-                accounts: accountsBalance,
+        accounts: accountsBalance,
         totalBalance: calculateTotalBalance(),
         
-                topCategories: allCategories,          topTags: allTags,          
-            categoryPieData: {
+        topCategories: allCategories,  
+        topTags: allTags,  
+        
+    categoryPieData: {
         labels: allCategories.map(cat => cat.category),
         data: allCategories.map(cat => cat.amount),
         colors: generateChartColors(allCategories.length)
@@ -11910,7 +12087,7 @@ function calculateTagStatistics(tags, totalExpense) {
 }
 
 async function getDebtReportData(year) {
-        const yearDebts = debts.filter(debt => {
+    const yearDebts = debts.filter(debt => {
         const startDate = new Date(debt.startDate);
         return startDate.getFullYear() === year;
     });
@@ -11934,14 +12111,15 @@ async function getDebtReportData(year) {
         debtCount: yearDebts.length,
         activeDebts,
         utilization: totalDebt > 0 ? (totalPaid / totalDebt) * 100 : 0,
-        debts: yearDebts.slice(0, 5)     };
+        debts: yearDebts.slice(0, 5) 
+    };
 }
 
 
 async function getBudgetReportData(monthKey) {
     const targets = categoryTargets[monthKey] || {};
     
-        let totalBudget = 0;
+    let totalBudget = 0;
     let totalSpent = 0;
     
     Object.entries(targets).forEach(([catId, target]) => {
@@ -11993,7 +12171,7 @@ function createDebtReportHTML(debtData) {
 }
 
 function createPieChartHTML(pieData, title) {
-        const displayData = {
+    const displayData = {
         labels: pieData.labels,
         data: pieData.data,
         colors: pieData.colors
@@ -12002,23 +12180,24 @@ function createPieChartHTML(pieData, title) {
     const total = displayData.data.reduce((a, b) => a + b, 0);
     const itemCount = displayData.labels.length;
     
-        let displayLabels = displayData.labels;
+    let displayLabels = displayData.labels;
     let displayDataValues = displayData.data;
     let displayColors = displayData.colors;
     let otherItems = [];
     
     if (itemCount > 15) {
-                displayLabels = displayData.labels.slice(0, 15);
+        displayLabels = displayData.labels.slice(0, 15);
         displayDataValues = displayData.data.slice(0, 15);
         displayColors = displayData.colors.slice(0, 15);
         
-                const otherAmount = displayData.data.slice(15).reduce((a, b) => a + b, 0);
+        const otherAmount = displayData.data.slice(15).reduce((a, b) => a + b, 0);
         const otherCount = itemCount - 15;
         
         if (otherAmount > 0) {
             displayLabels.push(`อื่นๆ (${otherCount} รายการ)`);
             displayDataValues.push(otherAmount);
-            displayColors.push('#CBD5E0');         }
+            displayColors.push('#CBD5E0'); 
+        }
     }
     
     let html = `
@@ -12035,7 +12214,7 @@ function createPieChartHTML(pieData, title) {
                     <div class="css-pie-chart" style="position: relative; width: 280px; height: 280px; margin: 0 auto;">
     `;
     
-        let accumulatedAngle = 0;
+    let accumulatedAngle = 0;
     let gradients = [];
     
     displayDataValues.forEach((value, index) => {
@@ -12088,7 +12267,7 @@ function createPieChartHTML(pieData, title) {
                         </div>
     `;
     
-        displayDataValues.forEach((value, index) => {
+    displayDataValues.forEach((value, index) => {
         const percentage = ((value / total) * 100).toFixed(1);
         const label = displayLabels[index];
         
@@ -12108,7 +12287,7 @@ function createPieChartHTML(pieData, title) {
         `;
     });
     
-        if (itemCount > 15) {
+    if (itemCount > 15) {
         const otherCount = itemCount - 15;
         html += `
             <div style="margin-top: 15px; padding: 12px; background: #f1f5f9; border-radius: 8px; font-size: 12px; color: #64748b; text-align: center;">
@@ -12607,7 +12786,7 @@ function getRecommendations(data) {
         recommendations.push("💰 <strong>อัตราการออมต่ำกว่าเป้าหมาย</strong> พยายามออมให้ได้อย่างน้อย 20% ของรายได้");
     }
     
-        if (data.topCategories.length > 0) {
+    if (data.topCategories.length > 0) {
         data.topCategories.forEach(cat => {
             const percentage = parseFloat(cat.percentage);
             if (percentage > 30) {
@@ -12616,7 +12795,7 @@ function getRecommendations(data) {
         });
     }
     
-        if (data.topTags.length > 0) {
+    if (data.topTags.length > 0) {
         data.topTags.forEach(tag => {
             const percentage = parseFloat(tag.percentage);
             if (percentage > 20) {
@@ -12640,21 +12819,21 @@ function getRecommendations(data) {
 }
 
 function openDateRangeModal() {
-        
-        document.getElementById('reportStartDate').value = '';
+    
+    document.getElementById('reportStartDate').value = '';
     document.getElementById('reportEndDate').value = '';
     
-        populateReportAccountSelect();
+    populateReportAccountSelect();
     
-        document.getElementById('reportAccountSelect').value = reportDateRange.accountId || 'all';
+    document.getElementById('reportAccountSelect').value = reportDateRange.accountId || 'all';
     
-        document.getElementById('selectedRangeDisplay').classList.add('hidden');
+    document.getElementById('selectedRangeDisplay').classList.add('hidden');
     
-        setupDateInputListeners();
+    setupDateInputListeners();
     
-        document.getElementById('dateRangeModal').classList.remove('hidden');
+    document.getElementById('dateRangeModal').classList.remove('hidden');
     
-        setTimeout(() => {
+    setTimeout(() => {
         document.getElementById('reportStartDate').focus();
     }, 300);
 }
@@ -12662,7 +12841,7 @@ function openDateRangeModal() {
 function populateReportAccountSelect() {
     const select = document.getElementById('reportAccountSelect');
     
-        let optionsHTML = '<option value="all">📊 สรุปทุกบัญชี</option>';
+    let optionsHTML = '<option value="all">📊 สรุปทุกบัญชี</option>';
     
     accounts.forEach(acc => {
         const balance = getAccountBalance(acc.id);
@@ -12675,7 +12854,7 @@ function populateReportAccountSelect() {
     
     select.innerHTML = optionsHTML;
     
-        if (reportDateRange.accountId) {
+    if (reportDateRange.accountId) {
         select.value = reportDateRange.accountId;
     }
 }
@@ -12684,10 +12863,10 @@ function setupDateInputListeners() {
     const startDateInput = document.getElementById('reportStartDate');
     const endDateInput = document.getElementById('reportEndDate');
     
-        startDateInput.removeEventListener('change', handleDateChange);
+    startDateInput.removeEventListener('change', handleDateChange);
     endDateInput.removeEventListener('change', handleDateChange);
     
-        startDateInput.addEventListener('change', handleDateChange);
+    startDateInput.addEventListener('change', handleDateChange);
     endDateInput.addEventListener('change', handleDateChange);
 }
 
@@ -12695,11 +12874,11 @@ function handleDateChange() {
     const startDate = document.getElementById('reportStartDate').value;
     const endDate = document.getElementById('reportEndDate').value;
     
-        if (startDate || endDate) {
+    if (startDate || endDate) {
         updateDateRangeDisplay();
     }
     
-    }
+}
 
 
 
@@ -12744,34 +12923,35 @@ function setDateRange(rangeType) {
             endDate = new Date(today.getFullYear(), 11, 31);
             break;
         case 'custom':
-                        break;
+            break;
     }
     
     document.getElementById('reportStartDate').value = formatDateForInput(startDate);
     document.getElementById('reportEndDate').value = formatDateForInput(endDate);
 
-        const accountId = document.getElementById('reportAccountSelect').value;
+    const accountId = document.getElementById('reportAccountSelect').value;
     
-        updateDateRangeDisplay();
+    updateDateRangeDisplay();
 }
 
 
 
 function clearDateRange() {
-        document.getElementById('reportStartDate').value = '';
+    document.getElementById('reportStartDate').value = '';
     document.getElementById('reportEndDate').value = '';
     
-        reportDateRange = {
+    reportDateRange = {
         startDate: null,
         endDate: null,
-        accountId: 'all',         isCustomRange: false
+        accountId: 'all', 
+        isCustomRange: false
     };
     
-        document.getElementById('reportAccountSelect').value = 'all';
+    document.getElementById('reportAccountSelect').value = 'all';
     
-        document.getElementById('selectedRangeDisplay').classList.add('hidden');
+    document.getElementById('selectedRangeDisplay').classList.add('hidden');
     
-        setTimeout(() => {
+    setTimeout(() => {
         document.getElementById('reportStartDate').focus();
     }, 100);
     
@@ -12804,35 +12984,35 @@ function confirmDateRange() {
         return;
     }
     
-        reportDateRange = {
+    reportDateRange = {
         startDate: startDate,
         endDate: endDate,
         accountId: accountId,
         isCustomRange: true
     };
     
-        closeDateRangeModal();
+    closeDateRangeModal();
     
-        setTimeout(() => {
+    setTimeout(() => {
         generatePDFReportWithRangeAuto();
     }, 500);
 }
 
 async function generatePDFReportWithRange() {
-        if (!reportDateRange.startDate || !reportDateRange.endDate) {
+    if (!reportDateRange.startDate || !reportDateRange.endDate) {
         openDateRangeModal();
     } else {
-                await generatePDFReportWithRangeAuto();
+        await generatePDFReportWithRangeAuto();
     }
 }
 
 async function createHTMLReportWithDateRange(startDateStr, endDateStr, accountId = 'all') {
-        const reportData = await gatherReportDataByDateRange(startDateStr, endDateStr, accountId);
+    const reportData = await gatherReportDataByDateRange(startDateStr, endDateStr, accountId);
     const htmlContent = createPDFHTMLWithDateRange(reportData, startDateStr, endDateStr, accountId);
     await downloadHTMLFile(htmlContent, reportData);
     
     showToast('✅ สร้างรายงาน HTML สำเร็จ');
-                setTimeout(() => {
+        setTimeout(() => {
             refreshUIAfterReport();
         }, 500);
 }
@@ -12845,14 +13025,14 @@ async function generatePDFReportWithRangeAuto() {
     }
     
     try {
-                if (!document.getElementById('settingsModal').classList.contains('hidden')) {
+        if (!document.getElementById('settingsModal').classList.contains('hidden')) {
             toggleSettingsModal();
         }
         
-                const accountName = reportDateRange.accountId === 'all' ? 'ทุกบัญชี' : getAccountById(reportDateRange.accountId)?.name;
+        const accountName = reportDateRange.accountId === 'all' ? 'ทุกบัญชี' : getAccountById(reportDateRange.accountId)?.name;
         showToast(`🔄 กำลังสร้างรายงานตามช่วงเวลา (บัญชี: ${accountName})...`);
         
-                await createHTMLReportWithDateRange(reportDateRange.startDate, reportDateRange.endDate, reportDateRange.accountId);
+        await createHTMLReportWithDateRange(reportDateRange.startDate, reportDateRange.endDate, reportDateRange.accountId);
         
     } catch (error) {
         console.error('Error generating report with date range:', error);
@@ -12864,13 +13044,13 @@ function refreshUIAfterReport() {
     console.log("🔄 รีเฟรช UI หลังสร้างรายงาน...");
     
     try {
-                reportDateRange = {
+        reportDateRange = {
             startDate: null,
             endDate: null,
             isCustomRange: false
         };
         
-                const currentPage = getCurrentPage();
+        const currentPage = getCurrentPage();
         
         switch(currentPage) {
             case 'overview':
@@ -12883,7 +13063,7 @@ function refreshUIAfterReport() {
                 break;
                 
             case 'analysis':
-                                if (reportDateRange.startDate) {
+                if (reportDateRange.startDate) {
                     const startDate = new Date(reportDateRange.startDate);
                     analysisDate = startDate;
                     updateAnalysisPeriodText();
@@ -12909,17 +13089,17 @@ function refreshUIAfterReport() {
                 break;
         }
         
-                updateAccountFilterDropdown();
+        updateAccountFilterDropdown();
         
-                updateAllAccountIndicators();
+        updateAllAccountIndicators();
         
-                if (financeDB && financeDB.loadInitialData) {
+        if (financeDB && financeDB.loadInitialData) {
             setTimeout(() => {
                 financeDB.loadInitialData();
             }, 500);
         }
         
-                showToast("✅ รายงานสร้างสำเร็จและรีเฟรชข้อมูลแล้ว");
+        showToast("✅ รายงานสร้างสำเร็จและรีเฟรชข้อมูลแล้ว");
         
         console.log("✅ รีเฟรช UI เสร็จสิ้น");
         
@@ -12929,18 +13109,18 @@ function refreshUIAfterReport() {
 }
 
 async function generatePDFReport() {
-        const today = new Date();
+    const today = new Date();
     const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
     const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     
     try {
-                toggleSettingsModal();
+        toggleSettingsModal();
         
-                showToast("🔄 กำลังสร้างรายงานเดือนปัจจุบัน...");
+        showToast("🔄 กำลังสร้างรายงานเดือนปัจจุบัน...");
         
-                await createHTMLReportWithDateRange(formatDateForInput(startDate), formatDateForInput(endDate));
+        await createHTMLReportWithDateRange(formatDateForInput(startDate), formatDateForInput(endDate));
 
-                setTimeout(() => {
+        setTimeout(() => {
             refreshUIAfterReport();
         }, 1000);
         
@@ -12954,19 +13134,19 @@ async function gatherReportDataByDateRange(startDateStr, endDateStr, accountId =
     const startDate = new Date(startDateStr);
     const endDate = new Date(endDateStr);
     
-        let filteredTransactions = transactions.filter(t => {
+    let filteredTransactions = transactions.filter(t => {
         const txDate = new Date(t.rawDate);
         return txDate >= startDate && txDate <= endDate;
     });
     
-        if (accountId !== 'all') {
+    if (accountId !== 'all') {
         filteredTransactions = filteredTransactions.filter(t => 
             t.accountId === accountId || 
             (t.type === 'transfer' && t.transferToAccountId === accountId)
         );
     }
     
-        const income = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const income = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const expense = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
     const balance = income - expense;
     
@@ -12995,7 +13175,7 @@ async function gatherReportDataByDateRange(startDateStr, endDateStr, accountId =
         }
     }
     
-        const spendingByCategory = {};
+    const spendingByCategory = {};
     const expenseTransactions = filteredTransactions.filter(t => t.type === 'expense');
     
     expenseTransactions.forEach(t => {
@@ -13011,7 +13191,7 @@ async function gatherReportDataByDateRange(startDateStr, endDateStr, accountId =
         spendingByCategory[t.category].count++;
     });
     
-        Object.keys(spendingByCategory).forEach(category => {
+    Object.keys(spendingByCategory).forEach(category => {
         spendingByCategory[category].percentage = expense > 0 ? 
             (spendingByCategory[category].amount / expense) * 100 : 0;
     });
@@ -13023,7 +13203,7 @@ async function gatherReportDataByDateRange(startDateStr, endDateStr, accountId =
         }))
         .sort((a, b) => b.amount - a.amount);
     
-        const spendingByTag = {};
+    const spendingByTag = {};
     const taggedTransactions = expenseTransactions.filter(t => t.tag && t.tag.trim() !== '');
     
     taggedTransactions.forEach(t => {
@@ -13039,7 +13219,7 @@ async function gatherReportDataByDateRange(startDateStr, endDateStr, accountId =
         spendingByTag[tag].count++;
     });
     
-        Object.keys(spendingByTag).forEach(tag => {
+    Object.keys(spendingByTag).forEach(tag => {
         spendingByTag[tag].percentage = expense > 0 ? 
             (spendingByTag[tag].amount / expense) * 100 : 0;
     });
@@ -13051,10 +13231,10 @@ async function gatherReportDataByDateRange(startDateStr, endDateStr, accountId =
         }))
         .sort((a, b) => b.amount - a.amount);
 
-        const debtData = await getDebtReportDataByDateRange(startDateStr, endDateStr);
+    const debtData = await getDebtReportDataByDateRange(startDateStr, endDateStr);
     
     return {
-                startDate: startDateStr,
+        startDate: startDateStr,
         endDate: endDateStr,
         displayStartDate: formatDateForDisplay(startDateStr),
         displayEndDate: formatDateForDisplay(endDateStr),
@@ -13062,7 +13242,7 @@ async function gatherReportDataByDateRange(startDateStr, endDateStr, accountId =
         accountName: accountId === 'all' ? 'ทุกบัญชี' : getAccountById(accountId)?.name,
         reportDate: new Date().toLocaleDateString('th-TH'),
         
-                income,
+        income,
         expense,
         balance,
         investmentRate: investmentRate.toFixed(1),
@@ -13071,13 +13251,13 @@ async function gatherReportDataByDateRange(startDateStr, endDateStr, accountId =
         taggedTransactionCount: taggedTransactions.length,
         debt: debtData,
         
-                accounts: accountsBalance,
+        accounts: accountsBalance,
         totalBalance: calculateTotalBalance(),
         
-                topCategories: allCategories,
+        topCategories: allCategories,
         topTags: allTags,
         
-                categoryPieData: {
+        categoryPieData: {
             labels: allCategories.map(cat => cat.category),
             data: allCategories.map(cat => cat.amount),
             colors: generateChartColors(allCategories.length)
@@ -13094,7 +13274,7 @@ async function getDebtReportDataByDateRange(startDateStr, endDateStr) {
     const startDate = new Date(startDateStr);
     const endDate = new Date(endDateStr);
     
-        const rangeDebts = debts.filter(debt => {
+    const rangeDebts = debts.filter(debt => {
         const debtStartDate = new Date(debt.startDate);
         return debtStartDate >= startDate && debtStartDate <= endDate;
     });
@@ -13123,9 +13303,9 @@ async function getDebtReportDataByDateRange(startDateStr, endDateStr) {
 }
 
 function createPDFHTMLWithDateRange(data, startDateStr, endDateStr, accountId = 'all') {
-        const html = createPDFHTML(data);
+    const html = createPDFHTML(data);
     
-        const accountInfo = accountId === 'all' ? 
+    const accountInfo = accountId === 'all' ? 
         'ทุกบัญชี' : 
         `บัญชี: ${getAccountById(accountId)?.name || accountId}`;
     
@@ -13159,21 +13339,21 @@ function updateLocalSaveCheckbox() {
     if (!checkbox) return;
     
     if (!isLoggedIn) {
-                checkbox.checked = true;
+        checkbox.checked = true;
         checkbox.disabled = true;
         saveToLocalEnabled = true;
         
-                checkbox.closest('#localSaveOption')?.classList.add('opacity-50');
+        checkbox.closest('#localSaveOption')?.classList.add('opacity-50');
         
         if (hint) {
             hint.innerHTML = '🔒 โหมดผู้เยี่ยมชม: บันทึกในเครื่องเท่านั้น';
             hint.className = 'text-[10px] text-amber-500 mt-0.5';
         }
     } else {
-                checkbox.disabled = false;
+        checkbox.disabled = false;
         checkbox.closest('#localSaveOption')?.classList.remove('opacity-50');
         
-                const savedPreference = localStorage.getItem('fin_save_local_preference');
+        const savedPreference = localStorage.getItem('fin_save_local_preference');
         checkbox.checked = savedPreference !== null ? savedPreference === 'true' : true;
         saveToLocalEnabled = checkbox.checked;
         
@@ -13184,11 +13364,11 @@ function updateLocalSaveCheckbox() {
             hint.className = 'text-[10px] text-slate-400 mt-0.5';
         }
         
-                checkbox.removeEventListener('change', handleCheckboxChange);
+        checkbox.removeEventListener('change', handleCheckboxChange);
         checkbox.addEventListener('change', handleCheckboxChange);
     }
     
-        if (window.financeDB) {
+    if (window.financeDB) {
         window.financeDB.setSaveToLocalEnabled(saveToLocalEnabled);
     }
 }
@@ -13197,11 +13377,11 @@ function handleCheckboxChange(e) {
     saveToLocalEnabled = e.target.checked;
     localStorage.setItem('fin_save_local_preference', e.target.checked);
     
-        if (window.financeDB) {
+    if (window.financeDB) {
         window.financeDB.setSaveToLocalEnabled(saveToLocalEnabled);
     }
     
-        const hint = document.getElementById('localSaveHint');
+    const hint = document.getElementById('localSaveHint');
     if (hint) {
         hint.innerHTML = saveToLocalEnabled 
             ? '💾 บันทึกทั้ง MySQL และในเครื่อง'
@@ -13230,7 +13410,7 @@ function updateLocalSaveCheckbox() {
         checkbox.disabled = true;
         saveToLocalEnabled = true;
         
-                if (window.financeDB) {
+        if (window.financeDB) {
             window.financeDB.setSaveToLocalEnabled(true);
         }
         
@@ -13250,7 +13430,7 @@ function updateLocalSaveCheckbox() {
         
         saveToLocalEnabled = checkbox.checked;
         
-                if (window.financeDB) {
+        if (window.financeDB) {
             window.financeDB.setSaveToLocalEnabled(saveToLocalEnabled);
         }
         
@@ -13269,7 +13449,7 @@ function updateLocalSaveCheckbox() {
 async function cleanupLocalCache() {
     if (!isLoggedIn) return;
     
-        for (let i = 0; i < localStorage.length; i++) {
+    for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith('fin_cache_')) {
             localStorage.removeItem(key);
@@ -13277,9 +13457,9 @@ async function cleanupLocalCache() {
         }
     }
     
-        localStorage.removeItem('fin_cache_recent');
+    localStorage.removeItem('fin_cache_recent');
     
-        const allTx = JSON.parse(localStorage.getItem('fin_tx_v5') || '[]');
+    const allTx = JSON.parse(localStorage.getItem('fin_tx_v5') || '[]');
     const backendTx = allTx.filter(t => t.backendId);
     localStorage.setItem('fin_tx_v5', JSON.stringify(backendTx));
     
@@ -13299,7 +13479,7 @@ async function loadUserDataFromBackend() {
         await loadDebtsFromBackend();
         await loadTagsFromBackend();
         
-                await cleanupLocalCache();
+        await cleanupLocalCache();
         
         showToast('✅ โหลดข้อมูลจากเซิร์ฟเวอร์สำเร็จ', 'success');
         updateUI();
@@ -13312,7 +13492,7 @@ async function loadUserDataFromBackend() {
 
 
 function injectLocalSaveCheckbox() {
-        if (document.getElementById('localSaveOption')) return;
+    if (document.getElementById('localSaveOption')) return;
     
     const formContainer = document.getElementById('formContainer');
     if (!formContainer) {
@@ -13320,13 +13500,13 @@ function injectLocalSaveCheckbox() {
         return;
     }
     
-        const submitBtn = document.getElementById('submitBtn');
+    const submitBtn = document.getElementById('submitBtn');
     if (!submitBtn) {
         console.log('⚠️ ไม่พบ submitBtn');
         return;
     }
     
-        const checkboxHTML = `
+    const checkboxHTML = `
         <div id="localSaveOption" class="mt-4 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-600">
             <label class="flex items-center gap-3 cursor-pointer">
                 <input type="checkbox" 
@@ -13343,16 +13523,16 @@ function injectLocalSaveCheckbox() {
         </div>
     `;
     
-        submitBtn.insertAdjacentHTML('beforebegin', checkboxHTML);
+    submitBtn.insertAdjacentHTML('beforebegin', checkboxHTML);
     console.log('✅ แทรก checkbox สำเร็จ');
     
-        if (typeof updateLocalSaveCheckbox === 'function') {
+    if (typeof updateLocalSaveCheckbox === 'function') {
         updateLocalSaveCheckbox();
     }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(injectLocalSaveCheckbox, 1500);
+    setTimeout(injectLocalSaveCheckbox, 1500);
 });
 
 const originalManageFormContainer = manageFormContainer;
@@ -13362,23 +13542,23 @@ manageFormContainer = function() {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
-       const savedUser = localStorage.getItem('user');
+    const savedUser = localStorage.getItem('user');
     
     try {
         if (savedUser && savedUser !== 'null' && savedUser !== 'undefined') {
-                        currentUser = JSON.parse(savedUser);
+            currentUser = JSON.parse(savedUser);
             isLoggedIn = true;
             console.log('🔐 User logged in:', currentUser.username);
             
-                        if (typeof loadUserDataFromBackend === 'function') {
+            if (typeof loadUserDataFromBackend === 'function') {
                 loadUserDataFromBackend();
             }
         } else {
-                        isLoggedIn = false;
+            isLoggedIn = false;
             currentUser = { id: 'guest_' + Date.now() };
             console.log('👤 Guest mode');
             
-                                }
+        }
     } catch (e) {
         console.error('❌ Error parsing user:', e);
         localStorage.removeItem('user');
@@ -13386,12 +13566,13 @@ document.addEventListener('DOMContentLoaded', function() {
         currentUser = { id: 'guest_' + Date.now() };
     }
     
-        updateAuthButtons();
+    updateAuthButtons();
 });
 
 function checkLoginStatus() {
     const user = localStorage.getItem('user');
-    updateAuthButtons();     
+    updateAuthButtons(); 
+    
     if (user) {
         isLoggedIn = true;
         currentUser = JSON.parse(user);
@@ -13406,13 +13587,14 @@ function checkLoginStatus() {
 function showAuthSection() {
     document.getElementById('auth-section').style.display = 'block';
     document.getElementById('app-content').style.display = 'none';
-    showLogin(); }
+    showLogin(); 
+}
 
 function showAppContent() {
     document.getElementById('auth-section').style.display = 'none';
     document.getElementById('app-content').style.display = 'block';
     
-        addLogoutButton();
+    addLogoutButton();
 }
 
 function showLogin() {
@@ -13426,7 +13608,7 @@ function showRegister() {
 }
 
 function addLogoutButton() {
-        if (!document.getElementById('logout-btn')) {
+    if (!document.getElementById('logout-btn')) {
         const logoutBtn = document.createElement('button');
         logoutBtn.id = 'logout-btn';
         logoutBtn.onclick = logout;
@@ -13437,7 +13619,7 @@ function addLogoutButton() {
 function showToast(message, type = 'success') {
     const toast = document.getElementById('toast');
     
-        if (type === 'success') {
+    if (type === 'success') {
         toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-2xl text-sm font-bold z-[9999] transition-all duration-300';
     } else if (type === 'error') {
         toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-rose-600 text-white px-6 py-3 rounded-2xl shadow-2xl text-sm font-bold z-[9999] transition-all duration-300';
@@ -13450,7 +13632,7 @@ function showToast(message, type = 'success') {
     toast.style.opacity = '1';
     toast.style.transform = 'translateX(-50%) translateY(0)';
     
-        setTimeout(() => { 
+    setTimeout(() => { 
         toast.style.opacity = '0';
         toast.style.transform = 'translateX(-50%) translateY(-20px)';
         setTimeout(() => {
@@ -13482,7 +13664,7 @@ async function login() {
         const data = await response.json();
         
         if (response.ok) {
-                        if (currentUser?.id) {
+            if (currentUser?.id) {
                 const allTx = await financeDB.getAllTransactions();
                 const oldUserTx = allTx.filter(t => t.owner_type === 'user' && t.owner_id === currentUser.id);
                 for (const tx of oldUserTx) {
@@ -13490,21 +13672,21 @@ async function login() {
                 }
             }
             
-                        localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('user', JSON.stringify(data.user));
             isLoggedIn = true;
             currentUser = data.user;
             
             hideLoginModal();
             updateAuthButtons();
             
-                        showToast('🔄 กำลังโหลดข้อมูลจากเซิร์ฟเวอร์...', 'info');
+            showToast('🔄 กำลังโหลดข้อมูลจากเซิร์ฟเวอร์...', 'info');
             await loadTransactionsFromBackend();
             
-                        await loadInitialData();
+            await loadInitialData();
             
-                        updateLocalSaveCheckbox();
+            updateLocalSaveCheckbox();
             
-                        updateUI();
+            updateUI();
             renderCalendar();
             
             showToast('✅ เข้าสู่ระบบสำเร็จ!', 'success');
@@ -13520,7 +13702,6 @@ async function login() {
 
 
 
-
 async function loadUserDataFromBackend() {
     if (!isLoggedIn || !navigator.onLine) {
         console.log('⏳ ไม่สามารถโหลดข้อมูลได้ (ไม่มีเน็ตหรือยังไม่ login)');
@@ -13530,7 +13711,7 @@ async function loadUserDataFromBackend() {
     showToast('🔄 กำลังโหลดข้อมูลจากเซิร์ฟเวอร์...', 'info');
     
     try {
-                try {
+        try {
             await loadTransactionsFromBackend();
         } catch (e) {
             console.error('Error loading transactions:', e);
@@ -13568,7 +13749,7 @@ async function loadUserDataFromBackend() {
         
         showToast('✅ โหลดข้อมูลจากเซิร์ฟเวอร์สำเร็จ', 'success');
         
-                updateUI();
+        updateUI();
         
     } catch (error) {
         console.error('Error loading user data:', error);
@@ -13612,7 +13793,7 @@ async function loadTransactionsFromBackend() {
                 rawDate: tx.rawDate || tx.date || '',
                 monthKey: tx.monthKey || '',
                 date: tx.date || tx.rawDate || '',
-                                accountId: tx.accountId ? tx.accountId.toString() : null,
+                accountId: tx.accountId ? tx.accountId.toString() : null,
                 backendId: tx.id,
                 isFromBackend: true,
                 createdAt: tx.createdAt || new Date().toISOString(),
@@ -13646,8 +13827,9 @@ async function loadAccountsFromBackend() {
         
         console.log(`📥 โหลด ${serverAccounts.length} accounts จาก backend`);
         
-                for (const acc of serverAccounts) {
-                        acc.id = acc.id.toString();              
+        for (const acc of serverAccounts) {
+            acc.id = acc.id.toString();  
+            
             const exists = accounts.some(a => a.id === acc.id);
             if (!exists) {
                 accounts.push(acc);
@@ -13669,7 +13851,7 @@ async function loadCategoriesFromBackend() {
         
         console.log(`📥 โหลด categories จาก backend:`, serverCategories);
         
-                if (serverCategories && 
+        if (serverCategories && 
             ((serverCategories.income && serverCategories.income.length > 0) ||
              (serverCategories.spending && serverCategories.spending.length > 0) ||
              (serverCategories.investment && serverCategories.investment.length > 0))) {
@@ -13680,19 +13862,18 @@ async function loadCategoriesFromBackend() {
                 investment: serverCategories.investment || []
             };
         } else {
-                        console.log('⚠️ ไม่พบข้อมูล categories จาก backend, ใช้ค่าเริ่มต้น');
+            console.log('⚠️ ไม่พบข้อมูล categories จาก backend, ใช้ค่าเริ่มต้น');
             customCategories = JSON.parse(JSON.stringify(defaultCategories));
         }
         
-                localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
+        localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
         
-                updateCategorySelect();
+        updateCategorySelect();
         
     } catch (error) {
         console.error('Error loading categories:', error);
-            }
+    }
 }
-
 
 async function loadTagsFromBackend() {
     if (!isLoggedIn || !navigator.onLine) return;
@@ -13703,7 +13884,7 @@ async function loadTagsFromBackend() {
         
         console.log(`📥 โหลด ${serverTags.length} tags จาก backend`);
         
-                for (const tag of serverTags) {
+        for (const tag of serverTags) {
             const exists = tags.some(t => t.id === tag.id);
             if (!exists) {
                 tags.push({
@@ -13714,7 +13895,7 @@ async function loadTagsFromBackend() {
             }
         }
         
-                localStorage.setItem('fin_tags', JSON.stringify(tags));
+        localStorage.setItem('fin_tags', JSON.stringify(tags));
         
     } catch (error) {
         console.error('Error loading tags:', error);
@@ -13752,7 +13933,7 @@ async function saveTagToBackend(tagData) {
 async function deleteTagFromBackend(tagId) {
     if (!isLoggedIn || !navigator.onLine) return false;
     
-        if (tagId.toString().startsWith('tag_')) return true;
+    if (tagId.toString().startsWith('tag_')) return true;
     
     try {
         const response = await fetch(`${API_URL}/tags/${tagId}?user_id=${currentUser.id}`, {
@@ -13774,7 +13955,7 @@ async function loadBudgetsFromBackend() {
         
         console.log(`📥 โหลด budgets จาก backend`);
         
-                categoryTargets[monthKey] = serverBudgets;
+        categoryTargets[monthKey] = serverBudgets;
         localStorage.setItem('fin_targets_v5', JSON.stringify(categoryTargets));
         
     } catch (error) {
@@ -13790,14 +13971,14 @@ async function loadDebtsFromBackend() {
         
         console.log(`📥 โหลด ${serverDebts.length} debts จาก backend`);
         
-                for (const debt of serverDebts) {
+        for (const debt of serverDebts) {
             const exists = debts.some(d => d.id === debt.id);
             if (!exists) {
                 debts.push(debt);
             }
         }
         
-                saveDebtsToStorage();
+        saveDebtsToStorage();
         
     } catch (error) {
         console.error('Error loading debts:', error);
@@ -13830,7 +14011,7 @@ async function saveDebtToBackend(debtData) {
         const result = await response.json();
         
         if (response.ok && result.id && debtData.id.startsWith('debt_')) {
-                        const index = debts.findIndex(d => d.id === debtData.id);
+            const index = debts.findIndex(d => d.id === debtData.id);
             if (index !== -1) {
                 debts[index].id = result.id.toString();
                 debts[index].backendId = result.id;
@@ -13848,7 +14029,7 @@ async function saveDebtToBackend(debtData) {
 async function updateDebtInBackend(debtData) {
     if (!isLoggedIn || !navigator.onLine) return false;
     
-        if (debtData.id.toString().startsWith('debt_')) {
+    if (debtData.id.toString().startsWith('debt_')) {
         return saveDebtToBackend(debtData);
     }
     
@@ -13929,9 +14110,9 @@ async function register() {
         if (response.ok) {
             showToast('✅ สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบ', 'success');
             
-                        showLoginInModal();
+            showLoginInModal();
             
-                        document.getElementById('reg-username').value = '';
+            document.getElementById('reg-username').value = '';
             document.getElementById('reg-password').value = '';
             document.getElementById('reg-confirm-password').value = '';
             
@@ -13947,19 +14128,19 @@ async function register() {
 
 async function logout() {
     showConfirm('ออกจากระบบ?', 'ข้อมูลในเครื่องจะยังคงอยู่', async () => {
-                const queue = JSON.parse(localStorage.getItem('syncQueue') || '[]');
+        const queue = JSON.parse(localStorage.getItem('syncQueue') || '[]');
         if (queue.length > 0 && navigator.onLine) {
             showToast('🔄 กำลังซิงค์ข้อมูลก่อนออกจากระบบ...', 'info');
             await processSyncQueue();
         }
         
-                const userId = currentUser?.id;
+        const userId = currentUser?.id;
         
-                localStorage.removeItem('user');
+        localStorage.removeItem('user');
         isLoggedIn = false;
         currentUser = { id: 'guest_' + Date.now() };
         
-                if (userId) {
+        if (userId) {
             const allTx = await financeDB.getAllTransactions();
             const userTx = allTx.filter(t => t.owner_type === 'user' && t.owner_id === userId);
             
@@ -13969,29 +14150,29 @@ async function logout() {
             console.log(`🗑️ ลบข้อมูล user ${userId} จำนวน ${userTx.length} รายการ`);
         }
         
-                await loadInitialData();
+        await loadInitialData();
         
-                updateLocalSaveCheckbox();
+        updateLocalSaveCheckbox();
         
         updateAuthButtons();
         hideConfirm();
         
         showToast('👋 ออกจากระบบสำเร็จ', 'success');
         
-                updateUI();
+        updateUI();
     });
 }
 
 function closeAllModals() {
     console.log('Closing all modals...');
     
-        const settingsModal = document.getElementById('settingsModal');
+    const settingsModal = document.getElementById('settingsModal');
     if (settingsModal) {
         settingsModal.style.display = 'none';
         settingsModal.classList.remove('active', 'open', 'show');
     }
     
-        const mobileMenu = document.getElementById('mobileSideMenu');
+    const mobileMenu = document.getElementById('mobileSideMenu');
     if (mobileMenu) {
         mobileMenu.style.display = 'none';
         const panel = document.getElementById('sideMenuPanel');
@@ -14000,7 +14181,7 @@ function closeAllModals() {
         if (backdrop) backdrop.style.display = 'none';
     }
     
-        document.querySelectorAll('.modal-backdrop, .menu-backdrop, .fixed.inset-0.bg-black\\/50').forEach(el => {
+    document.querySelectorAll('.modal-backdrop, .menu-backdrop, .fixed.inset-0.bg-black\\/50').forEach(el => {
         el.style.display = 'none';
     });
     
@@ -14029,7 +14210,7 @@ async function addTransaction(transactionData) {
         });
 
         if (response.ok) {
-                        loadUserData();
+            loadUserData();
         } else {
             alert('ไม่สามารถบันทึกข้อมูลได้');
         }
@@ -14062,19 +14243,19 @@ async function addTransaction(transaction) {
     return response.json();
 }
 
-
 function showLoginModal() {
     console.log('🔐 Opening login modal');
     
     const modal = document.getElementById('loginModal');
     if (modal) {
         modal.classList.remove('hidden');
-        modal.classList.add('flex');         
-                showLoginInModal();
+        modal.classList.add('flex'); 
         
-                document.body.style.overflow = 'hidden';
+        showLoginInModal();
         
-                setTimeout(() => {
+        document.body.style.overflow = 'hidden';
+        
+        setTimeout(() => {
             document.getElementById('login-username')?.focus();
         }, 300);
     } else {
@@ -14090,9 +14271,9 @@ function hideLoginModal() {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
         
-                document.body.style.overflow = 'auto';
+        document.body.style.overflow = 'auto';
         
-                document.getElementById('login-username').value = '';
+        document.getElementById('login-username').value = '';
         document.getElementById('login-password').value = '';
         document.getElementById('reg-username').value = '';
         document.getElementById('reg-password').value = '';
@@ -14114,7 +14295,7 @@ function showRegisterInModal() {
 }
 
 function closeLoginModalOnBackdrop(event) {
-        if (event.target === event.currentTarget) {
+    if (event.target === event.currentTarget) {
         hideLoginModal();
     }
 }
