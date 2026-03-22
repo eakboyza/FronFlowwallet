@@ -121,28 +121,28 @@
         <div class="py-4 overflow-y-auto h-[calc(100vh-200px)]">
 
             <div id="mobileAuthButtonContainer" class="mb-6">
-                <button id="mobileLoginButton" onclick="showLoginModal(); closeMobileSideMenu();" 
-                        class="w-full bg-indigo-600 text-white p-4 rounded-xl hover:bg-indigo-700 flex items-center justify-center gap-2 font-bold transition-all">
-                    <span>🔐</span>
-                    <span>เข้าสู่ระบบ</span>
-                </button>
-                
-                <div id="mobileLogoutButton" class="hidden">
-                    <div class="bg-gradient-to-r from-rose-500 to-rose-600 text-white p-4 rounded-xl">
-                        <div class="flex items-center justify-between mb-3">
-                            <div class="flex items-center gap-2">
-                                <span>🚪</span>
-                                <span class="font-bold">บัญชีของฉัน</span>
-                            </div>
-                            <span id="mobileLoggedInUsername" class="text-xs bg-white/20 px-3 py-1 rounded-full"></span>
-                        </div>
-                        <button onclick="logout()" 
-                                class="w-full bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg text-sm font-bold transition-colors">
-                            ออกจากระบบ
-                        </button>
-                    </div>
+    <button id="mobileLoginBtn" onclick="showLoginModal(); closeMobileSideMenu();" 
+            class="w-full bg-indigo-600 text-white p-4 rounded-xl hover:bg-indigo-700 flex items-center justify-center gap-2 font-bold transition-all">
+        <span>🔐</span>
+        <span>เข้าสู่ระบบ</span>
+    </button>
+    
+    <div id="mobileLogoutBtn" class="hidden">
+        <div class="bg-gradient-to-r from-rose-500 to-rose-600 text-white p-4 rounded-xl">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <span>🚪</span>
+                    <span class="font-bold">บัญชีของฉัน</span>
                 </div>
+                <span id="mobileUsername" class="text-xs bg-white/20 px-3 py-1 rounded-full"></span>
             </div>
+            <button onclick="logout()" 
+                    class="w-full bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg text-sm font-bold transition-colors">
+                ออกจากระบบ
+            </button>
+        </div>
+    </div>
+</div>
 
             <div class="px-4 mb-4">
                 <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">การบันทึกข้อมูล</p>
@@ -220,6 +220,32 @@
         
         <h3 class="text-lg font-bold text-slate-800 mb-6 dark:text-white flex items-center gap-2">⚙️ ตั้งค่าระบบ</h3>
         
+
+        <div id="mobileSettingsAuthContainer" class="mb-6">
+            <button id="mobileSettingsLoginBtn" onclick="showLoginModal(); closeMobileSettingsModal();" 
+                    class="w-full bg-indigo-600 text-white p-4 rounded-xl hover:bg-indigo-700 flex items-center justify-center gap-2 font-bold transition-all">
+                <span>🔐</span>
+                <span>เข้าสู่ระบบ</span>
+            </button>
+            
+            <div id="mobileSettingsLogoutBtn" class="hidden">
+                <div class="bg-gradient-to-r from-rose-500 to-rose-600 text-white p-4 rounded-xl">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <span>🚪</span>
+                            <span class="font-bold">บัญชีของฉัน</span>
+                        </div>
+                        <span id="mobileSettingsUsername" class="text-xs bg-white/20 px-3 py-1 rounded-full"></span>
+                    </div>
+                    <button onclick="logout()" 
+                            class="w-full bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg text-sm font-bold transition-colors">
+                        ออกจากระบบ
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
         <div class="space-y-4">
             <button onclick="openManageCatsModal(); closeMobileSettingsModal();" 
                     class="w-full flex items-center gap-3 p-4 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors dark:bg-slate-700/50 dark:hover:bg-slate-700">
