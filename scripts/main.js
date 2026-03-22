@@ -10550,26 +10550,58 @@ function closeMobileSideMenu() {
 function updateAuthButtons() {
     console.log('🔄 Updating auth buttons...');
     
-    const loginBtn = document.getElementById('loginButton');
-    const logoutDiv = document.getElementById('logoutButton');
+    const user = JSON.parse(localStorage.getItem('user'));
+    const isLoggedInUser = !!(user && user.username);
+    
+    const desktopLoginBtn = document.getElementById('loginButton');
+    const desktopLogoutDiv = document.getElementById('logoutButton');
     const usernameSpan = document.getElementById('loggedInUsername');
     
-    const user = JSON.parse(localStorage.getItem('user'));
+    if (desktopLoginBtn) {
+        desktopLoginBtn.classList.toggle('hidden', isLoggedInUser);
+    }
+    if (desktopLogoutDiv) {
+        desktopLogoutDiv.classList.toggle('hidden', !isLoggedInUser);
+    }
+    if (usernameSpan && user) {
+        usernameSpan.textContent = user.username || '';
+    }
     
-    if (user && user.username) {
-        if (loginBtn) loginBtn.classList.add('hidden');
-        if (logoutDiv) logoutDiv.classList.remove('hidden');
-        if (usernameSpan) usernameSpan.textContent = user.username;
-        console.log('🔐 Showing logout button for:', user.username);
-        
-        updateLocalSaveCheckbox();
-        
-    } else {
-        if (loginBtn) loginBtn.classList.remove('hidden');
-        if (logoutDiv) logoutDiv.classList.add('hidden');
-        
+    const mobileLoginBtn = document.getElementById('mobileLoginBtn');
+    const mobileLogoutDiv = document.getElementById('mobileLogoutBtn');
+    const mobileUsernameSpan = document.getElementById('mobileUsername');
+    
+    if (mobileLoginBtn) {
+        mobileLoginBtn.classList.toggle('hidden', isLoggedInUser);
+    }
+    if (mobileLogoutDiv) {
+        mobileLogoutDiv.classList.toggle('hidden', !isLoggedInUser);
+    }
+    if (mobileUsernameSpan && user) {
+        mobileUsernameSpan.textContent = user.username || '';
+        mobileUsernameSpan.classList.toggle('hidden', !isLoggedInUser);
+    }
+    
+    const mobileSettingsLoginBtn = document.getElementById('mobileSettingsLoginBtn');
+    const mobileSettingsLogoutDiv = document.getElementById('mobileSettingsLogoutBtn');
+    const mobileSettingsUsernameSpan = document.getElementById('mobileSettingsUsername');
+    
+    if (mobileSettingsLoginBtn) {
+        mobileSettingsLoginBtn.classList.toggle('hidden', isLoggedInUser);
+    }
+    if (mobileSettingsLogoutDiv) {
+        mobileSettingsLogoutDiv.classList.toggle('hidden', !isLoggedInUser);
+    }
+    if (mobileSettingsUsernameSpan && user) {
+        mobileSettingsUsernameSpan.textContent = user.username || '';
+        mobileSettingsUsernameSpan.classList.toggle('hidden', !isLoggedInUser);
+    }
+    
+    if (typeof updateLocalSaveCheckbox === 'function') {
         updateLocalSaveCheckbox();
     }
+    
+    console.log(`🔐 Auth buttons updated. Logged in: ${isLoggedInUser}`);
 }
 
 document.addEventListener('DOMContentLoaded', function() {
