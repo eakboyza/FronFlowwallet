@@ -207,7 +207,7 @@ const transferTypes = {
 
 const defaultAccounts = [
     {
-        id: 'default_acc',
+        id: 'default_acc', 
         name: 'บัญชีหลัก',
         type: 'savings',
         color: '#6366f1',
@@ -218,7 +218,7 @@ const defaultAccounts = [
         updatedAt: new Date().toISOString()
     },
     {
-        id: 'cash_acc',
+        id: 'cash_acc',  
         name: 'เงินสด',
         type: 'cash',
         color: '#10b981',
@@ -1557,37 +1557,122 @@ financeDB.init().then(success => {
 
 
 
+// ใน function loadInitialData() หรือที่เรียกตอน refresh
 async function loadInitialData() {
+    console.log('🚀 loadInitialData START, isLoggedIn =', isLoggedIn);
+    console.log('🔑 currentUser:', currentUser);
+    
     try {
-        const loadedTransactions = await financeDB.getAllTransactions();
-        
-        if (isLoggedIn) {
-            transactions = loadedTransactions.filter(t => 
-                t.owner_type === 'user' && t.owner_id === currentUser.id
-            );
-            console.log(`📊 Login: โหลด ${transactions.length} รายการของ user ${currentUser.id}`);
+        if (isLoggedIn && navigator.onLine) {
+            // ✅ โหลดทุกอย่างพร้อมกัน และรอให้เสร็จทั้งหมด
+            await Promise.all([
+                loadAccountsFromBackend(),
+                loadCategoriesFromBackend(),
+                loadTransactionsFromBackend(),
+                loadDebtsFromBackend(),
+                loadPaymentsFromBackend()      // ✅ สำคัญ! ต้องมี
+            ]);
+            
+            transactions = backendTransactions;
         } else {
-            const guestId = getGuestId();
-            transactions = loadedTransactions.filter(t => 
-                t.owner_type === 'guest' && t.owner_id === guestId
-            );
-            console.log(`📊 Guest: โหลด ${transactions.length} รายการของ guest ${guestId}`);
+            const loadedTransactions = await financeDB.getAllTransactions();
+            
+            if (isLoggedIn) {
+                transactions = loadedTransactions.filter(t => 
+                    t.owner_type === 'user' && t.owner_id === currentUser.id
+                );
+            } else {
+                const guestId = getGuestId();
+                transactions = loadedTransactions.filter(t => 
+                    t.owner_type === 'guest' && t.owner_id === guestId
+                );
+            }
+            
+            // ✅ Guest mode: ล้างข้อมูลหนี้
+            debts = [];
+            payments = [];
         }
-        
-        const loadedCategories = await financeDB.loadCategories();
-        customCategories = loadedCategories;
         
         const loadedTargets = await financeDB.loadBudgetTargets();
         categoryTargets = loadedTargets;
+
+        updateAccountSelect();
+        updateMobileAccountSelect();
+        updateCategorySelect();
         
         console.log(`📊 Loaded ${transactions.length} transactions`);
+        console.log(`📊 Loaded ${debts.length} debts`);
+        console.log(`📊 Loaded ${payments.length} payments`);  // ✅ เพิ่ม debug
         
+        // ✅ อัปเดต UI ครั้งเดียว หลังจากโหลดข้อมูลเสร็จ
         updateUI();
-        updateCategorySelect();
+        renderCalendar();
+        
+        const currentPage = getCurrentPage();
+        if (currentPage === 'budget') {
+            updateBudgetUI();
+        } else if (currentPage === 'analysis') {
+            refreshAnalysisCharts();
+        } else if (currentPage === 'yearly') {
+            updateYearlyUI();
+        } else if (currentPage === 'debt') {
+            renderDebtPage();  // ✅ ตอนนี้ payments มีข้อมูลแล้ว
+        } else if (currentPage === 'accounts') {
+            renderAccountsList();
+        }
         
     } catch (error) {
         console.error('Failed to load initial data:', error);
         loadFromLocalStorageFallback();
+        updateUI();
+    }
+}
+
+async function loadPaymentsFromBackend() {
+    if (!isLoggedIn || !navigator.onLine) return [];
+    
+    try {
+        const response = await fetch(`${API_URL}/debt-payments?user_id=${currentUser.id}`);
+        
+        if (!response.ok) {
+            console.warn('Failed to load payments from backend, status:', response.status);
+            return [];
+        }
+        
+        const serverPayments = await response.json();
+        
+        console.log(`📥 โหลด ${serverPayments.length} payments จาก backend`);
+        
+        // ✅ เคลียร์ payments array ก่อน แล้วค่อยเพิ่มใหม่
+        payments.length = 0;  // เคลียร์ array โดยไม่สร้างใหม่
+        
+        for (const payment of serverPayments) {
+            payments.push({
+                id: payment.id.toString(),
+                debtId: payment.debt_id.toString(),
+                accountId: payment.account_id ? payment.account_id.toString() : null,
+                amount: parseFloat(payment.amount),
+                date: payment.payment_date,
+                note: payment.note || '',
+                backendId: payment.id,
+                createdAt: payment.created_at
+            });
+            console.log(`✅ เพิ่ม payment: ${payment.id} (${payment.amount} บาท)`);
+        }
+        
+        // บันทึก local ตาม checkbox
+        if (saveToLocalEnabled) {
+            savePaymentsToStorage();
+            console.log('💾 บันทึก payments ลง localStorage');
+        } else {
+            console.log('⏭️ ข้ามการบันทึก payments ลง localStorage (saveToLocalEnabled = false)');
+        }
+        
+        return payments;  // ✅ return ค่าด้วย
+        
+    } catch (error) {
+        console.error('Error loading payments:', error);
+        return [];
     }
 }
 
@@ -1843,18 +1928,15 @@ let mobileFormState = {
 
 
 
-function showMobileActionModal(transaction) {
+function showMobileActionModal(transactionId) {
     if (!isMobile()) return;
     
     try {
+        let transaction = findTransactionById(transactionId);
         
-        if (typeof transaction === 'string') {
-            const tx = transactions.find(t => t.id === transaction);
-            if (!tx) {
-                console.error('Transaction not found:', transaction);
-                return;
-            }
-            transaction = tx;
+        if (!transaction) {
+            console.error('Transaction not found:', transactionId);
+            return;
         }
         
         window.selectedTransaction = transaction;
@@ -1890,7 +1972,16 @@ function openMobileForm(editTransaction = null) {
         resetMobileForm();
     }
 
-    updateAccountSelect();
+    updateMobileAccountSelect();
+    
+    // ✅ ถ้ามีการแก้ไข transaction ให้ set ค่า account select
+    if (editTransaction && editTransaction.accountId) {
+        const mobileSelect = document.getElementById('mobileAccountSelect');
+        if (mobileSelect) {
+            mobileSelect.value = editTransaction.accountId;
+            mobileFormState.accountId = editTransaction.accountId;
+        }
+    }
     
     setMobileType(mobileFormState.type);
     
@@ -1900,15 +1991,51 @@ function openMobileForm(editTransaction = null) {
     renderMobileCategories();
     
     document.getElementById('mobileDateInput').value = mobileFormState.date;
-
     updateMobileDateDisplay();
 
-     if (!editTransaction) {
+    if (!editTransaction) {
         const tagInput = document.getElementById('mobileTag');
         if (tagInput) tagInput.value = '';
     }
+}
 
+function updateMobileAccountSelect() {
+    const mobileSelect = document.getElementById('mobileAccountSelect');
+    if (!mobileSelect) return;
     
+    console.log('🔄 Updating mobile account select, accounts:', accounts.length);
+    
+    if (accounts.length === 0) {
+        mobileSelect.innerHTML = '<option value="">-- ไม่มีบัญชี --</option>';
+        return;
+    }
+    
+    // ✅ สร้าง options จาก accounts
+    let optionsHTML = '';
+    accounts.forEach(acc => {
+        const balance = getAccountBalance(acc.id);
+        const selected = (acc.id === currentAccountId) ? 'selected' : '';
+        optionsHTML += `
+            <option value="${acc.id}" ${selected}>
+                ${acc.icon} ${acc.name} (฿${balance.toLocaleString()})
+            </option>
+        `;
+    });
+    
+    mobileSelect.innerHTML = optionsHTML;
+    
+    // ✅ ตรวจสอบว่า currentAccountId อยู่ใน dropdown หรือไม่
+    if (currentAccountId && !accounts.some(a => a.id === currentAccountId)) {
+        // ถ้าไม่เจอ ให้เลือกตัวแรก
+        if (accounts.length > 0) {
+            mobileSelect.value = accounts[0].id;
+            console.log('📌 currentAccountId not found, using first account:', accounts[0].id);
+        }
+    } else if (currentAccountId) {
+        mobileSelect.value = currentAccountId;
+    }
+    
+    console.log('✅ Mobile account select updated, selected:', mobileSelect.value);
 }
 
 function closeMobileForm() {
@@ -1940,6 +2067,13 @@ function resetMobileForm() {
     document.querySelectorAll('.mobile-category-chip').forEach(chip => {
         chip.classList.remove('active');
     });
+    
+    // ✅ ไม่ต้องรีเซ็ต mobileAccountSelect ให้คงค่าเดิม
+    // แต่ถ้าต้องการให้เลือก currentAccountId:
+    const mobileSelect = document.getElementById('mobileAccountSelect');
+    if (mobileSelect && currentAccountId) {
+        mobileSelect.value = currentAccountId;
+    }
 }
 
 function loadTransactionToMobileForm(transaction) {
@@ -2210,7 +2344,18 @@ async function saveMobileTransaction() {
         const defaultAccount = accounts.find(a => a.isDefault);
         accountId = defaultAccount ? defaultAccount.id : 'default_acc';
     }
-
+    
+    // ✅ ตรวจสอบให้ accountId เป็น string เสมอ
+    accountId = String(accountId);
+    
+    // ✅ ไม่ต้องแปลง accountId เป็น number หรือ null
+    // ส่ง string ตรงๆ ไป backend
+    
+    const saveToLocalCheckbox = document.getElementById('mobileSaveToLocalCheckbox');
+    const saveToLocalEnabled = saveToLocalCheckbox ? saveToLocalCheckbox.checked : true;
+    
+    const isUpdate = !!mobileFormState.editingId;
+    
     const transaction = {
         id: mobileFormState.editingId || Date.now().toString() + Math.random().toString(36).substr(2, 9),
         amount: amountValue,
@@ -2224,9 +2369,11 @@ async function saveMobileTransaction() {
         rawDate: mobileFormState.date,
         monthKey: `${new Date(mobileFormState.date).getFullYear()}-${String(new Date(mobileFormState.date).getMonth() + 1).padStart(2, '0')}`,
         date: mobileFormState.date,
-        accountId: accountId,  
+        accountId: accountId,  // ✅ เป็น string เสมอ
         createdAt: mobileFormState.editingId ? undefined : new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        owner_type: isLoggedIn ? 'user' : 'guest',
+        owner_id: isLoggedIn ? currentUser.id : getGuestId()
     };
     
     if (mobileFormState.editingId && mobileFormState.isDebtPayment && mobileFormState.originalPaymentId) {
@@ -2251,45 +2398,122 @@ async function saveMobileTransaction() {
         }
     }
     
-    console.log("💾 บันทึกรายการจาก Mobile:", transaction);
+    console.log("💾 บันทึกรายการจาก Mobile:", transaction, isUpdate ? "(แก้ไข)" : "(ใหม่)");
     
-try {
-        const result = await financeDB.saveTransaction(transaction);
+    try {
+        let result = { success: true }; 
+        let backendId = null;
+        
+        if (isLoggedIn) {
+            if (navigator.onLine) {
+                console.log('🌐 Online - บันทึก MySQL');
+                let backendResult;
+                
+                // ✅ ส่ง accountId เป็น string ตรงๆ
+                const backendTransaction = {
+                    ...transaction,
+                    accountId: accountId  // ✅ ไม่ต้องแปลง
+                };
+                
+                if (isUpdate) {
+                    backendResult = await updateTransactionInBackend(backendTransaction);
+                    if (backendResult && backendResult.success) {
+                        backendId = transaction.id;
+                        console.log('✅ อัปเดต MySQL สำเร็จ, ID:', backendId);
+                    }
+                } else {
+                    backendResult = await saveTransactionToBackend(backendTransaction);
+                    if (backendResult && backendResult.id) {
+                        backendId = backendResult.id;
+                        transaction.id = backendId.toString();
+                        transaction.backendId = backendId;
+                        console.log('✅ บันทึก MySQL สำเร็จ, ID:', backendId);
+                    }
+                }
+            } 
+            else {
+                console.log('📱 Offline - ใส่คิวรอซิงค์');
+                addToSyncQueue(transaction, isUpdate ? 'update' : 'create');
+                showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
+            }
+            
+            if (saveToLocalEnabled) {
+                console.log('💾 บันทึกในเครื่อง (ตาม checkbox)');
+                const localTransaction = {
+                    ...transaction,
+                    accountId: accountId  // ✅ string
+                };
+                result = await financeDB.saveTransaction(localTransaction);
+            } else {
+                console.log('⏭️ ข้ามการบันทึกในเครื่อง (checkbox ไม่ติ๊ก)');
+                result.success = true; 
+            }
+        } 
+        else {
+            console.log('👤 Guest mode - บันทึกในเครื่อง');
+            const localTransaction = {
+                ...transaction,
+                accountId: accountId  // ✅ string
+            };
+            result = await financeDB.saveTransaction(localTransaction);
+        }
         
         if (result.success) {
-            if (mobileFormState.editingId) {
-                const existingIndex = transactions.findIndex(t => t.id === mobileFormState.editingId);
-                if (existingIndex !== -1) {
-                    transactions.splice(existingIndex, 1);
-                    transactions.unshift(transaction);
+            const displayTransaction = {
+                ...transaction,
+                accountId: accountId  // ✅ string
+            };
+            
+            if (saveToLocalEnabled) {
+                if (isUpdate) {
+                    const existingIndex = transactions.findIndex(t => t.id === mobileFormState.editingId);
+                    if (existingIndex !== -1) {
+                        transactions[existingIndex] = displayTransaction;
+                    }
                 } else {
-                    transactions.unshift(transaction);
+                    const exists = transactions.some(t => t.id === displayTransaction.id);
+                    if (!exists) {
+                        transactions.unshift(displayTransaction);
+                    }
                 }
+                console.log('✅ อัปเดต transactions array แล้ว');
             } else {
-                const existingIndex = transactions.findIndex(t => t.id === transaction.id);
-                if (existingIndex !== -1) {
-                    transactions[existingIndex] = transaction;
-                } else {
-                    transactions.unshift(transaction);
+                console.log('⏭️ ข้ามการอัปเดต transactions array (checkbox ไม่ติ๊ก)');
+                
+                if (isUpdate) {
+                    const index = transactions.findIndex(t => t.id === mobileFormState.editingId);
+                    if (index !== -1) {
+                        transactions[index] = displayTransaction;
+                    }
                 }
             }
             
-            try {
-                localStorage.setItem('fin_tx_v5', JSON.stringify(transactions.slice(0, 1000)));
-                
-                const cacheKey = `fin_cache_${transaction.monthKey}`;
-                const monthTransactions = transactions.filter(t => t.monthKey === transaction.monthKey);
-                localStorage.setItem(cacheKey, JSON.stringify(monthTransactions));
-                
-                console.log('✅ อัปเดต LocalStorage cache สำเร็จ');
-            } catch (cacheError) {
-                console.warn('⚠️ อัปเดต LocalStorage cache ไม่สำเร็จ:', cacheError);
+            if (saveToLocalEnabled) {
+                try {
+                    localStorage.setItem('fin_tx_v5', JSON.stringify(transactions.slice(0, 1000)));
+                    
+                    const cacheKey = `fin_cache_${displayTransaction.monthKey}`;
+                    const monthTransactions = transactions.filter(t => t.monthKey === displayTransaction.monthKey);
+                    localStorage.setItem(cacheKey, JSON.stringify(monthTransactions));
+                    
+                    console.log('✅ อัปเดต LocalStorage cache สำเร็จ');
+                } catch (cacheError) {
+                    console.warn('⚠️ อัปเดต LocalStorage cache ไม่สำเร็จ:', cacheError);
+                }
+            } else {
+                console.log('⏭️ ข้ามการอัปเดต localStorage (checkbox ไม่ติ๊ก)');
+            }
+            
+            if (isLoggedIn && navigator.onLine) {
+                console.log('🔄 โหลดข้อมูลจาก backend ใหม่...');
+                await loadTransactionsFromBackend();
+                isShowingBackendData = true;
             }
             
             closeMobileForm();
             
-            updateUI(); 
-            refreshAnalysisCharts(); 
+            updateUI();
+            refreshAnalysisCharts();
             
             if (!document.getElementById('page-budget').classList.contains('hidden')) {
                 updateBudgetUI();
@@ -2304,13 +2528,19 @@ try {
                 renderCalendar();
             }
             
-            let toastMsg = mobileFormState.editingId ? "✏️ แก้ไขสำเร็จ" : "✅ บันทึกสำเร็จ";
+            let toastMsg = isUpdate ? "✏️ แก้ไขสำเร็จ" : "✅ บันทึกสำเร็จ";
             if (mobileFormState.isDebtPayment) {
                 toastMsg = "💰 อัพเดตการผ่อนหนี้สำเร็จ";
             }
+            
+            if (!saveToLocalEnabled && isLoggedIn) {
+                toastMsg += " (เฉพาะ MySQL)";
+            } else if (!navigator.onLine && isLoggedIn) {
+                toastMsg += " (รอซิงค์)";
+            }
+            
             showToast(toastMsg);
             
-
         } else {
             showToast("❌ บันทึกไม่สำเร็จ");
         }
@@ -2349,58 +2579,19 @@ async function deleteFromMobileAction() {
     
     const id = window.selectedTransaction.id;
     const transaction = window.selectedTransaction; 
+
+    console.log('🗑️ deleteFromMobileAction called with id:', id);
     
     const isDebtPayment = transaction.isDebtPayment;
     const originalPaymentId = transaction.originalPaymentId;
     
     closeDayDetailModal();
-    
     closeMobileActionModal();
     
     showConfirm("ลบรายการ?", "ลบแล้วกู้คืนไม่ได้", async () => { 
+        console.log('🗑️ Confirm delete for id:', id);
         try {
-            const result = await financeDB.deleteTransaction(id);
-            
-            console.log('Delete result:', result);
-            
-            if (result.success) {
-                transactions = transactions.filter(t => t.id !== id);
-                
-                if (isDebtPayment && originalPaymentId) {
-                    console.log('🗑️ [Mobile] กำลังลบ payment record:', originalPaymentId);
-                    
-                    const paymentIndex = payments.findIndex(p => p.id === originalPaymentId);
-                    if (paymentIndex !== -1) {
-                        payments.splice(paymentIndex, 1);
-                        savePaymentsToStorage();
-                        
-                        console.log('✅ [Mobile] ลบ payment record สำเร็จ');
-                    }
-                }
-                
-                updateUI();
-
-                setTimeout(() => bindHistoryItemEvents(), 100);
-                
-                const isCalendarTabActive = !document.getElementById('overview-calendar-content').classList.contains('hidden');
-                if (isCalendarTabActive) {
-                    renderCalendar();
-                }
-                
-                refreshAnalysisCharts();
-                
-                if (isDebtPayment) {
-                    showToast("✅ ลบรายการผ่อนหนี้สำเร็จ (ทั้งสองฝั่ง)");
-                } else {
-                    showToast("✅ ลบรายการสำเร็จ");
-                }
-                
-            } else {
-                showToast("❌ ลบไม่สำเร็จ");
-            }
-            
-            hideConfirm();
-            
+            await deleteTransaction(id, true);
         } catch (error) {
             console.error('Error deleting transaction:', error);
             hideConfirm();
@@ -2479,7 +2670,7 @@ function updateCopyBudgetButtonText() {
     }
 }
 
-window.onload = () => {
+window.onload = async () => {  // ← เพิ่ม async
     console.log("=== WINDOW LOAD START ===");
     
     document.body.classList.add('dark');
@@ -2504,8 +2695,10 @@ window.onload = () => {
     updateAccountFilterDropdown();
     
     if (financeDB) {
-        financeDB.init().then(() => {
+        financeDB.init().then(async () => {  // ← เพิ่ม async
             console.log("✅ FinanceDB พร้อมใช้งานแล้ว");
+            
+            // ✅ เพิ่มบรรทัดนี้: เรียกใช้ Migration
             
             fixNullAccountIds().then(() => {
                 loadInitialData().then(() => {
@@ -2571,24 +2764,36 @@ function bindHistoryItemEvents() {
 }
 
 function handleHistoryItemClick(event) {
-    if (!isMobile()) return; 
+    console.log('🖱️ CLICKED! handleHistoryItemClick called');  // ✅ เพิ่มตรงนี้
     
+    // ตรวจสอบว่าเป็น Mobile หรือไม่
+    const isMobileDevice = window.innerWidth <= 768;
+    console.log('📱 isMobileDevice:', isMobileDevice);
+    
+    if (!isMobileDevice) return;
+    
+    // ป้องกัน event bubbling
     event.stopPropagation();
     
     const item = event.currentTarget;
     const transactionId = item.getAttribute('data-transaction-id');
+    
+    console.log('🔍 Transaction ID:', transactionId);
     
     if (!transactionId) {
         console.warn('No transaction ID found');
         return;
     }
     
-    const transaction = transactions.find(t => t.id === transactionId);
+    // ใช้ findTransactionById แทนการหาเอง
+    const transaction = findTransactionById(transactionId);
     
     if (transaction) {
-        showMobileActionModal(transaction);
+        console.log('✅ Found transaction:', transaction);
+        showMobileActionModal(transactionId);  // ส่ง ID ไม่ใช่ object
     } else {
-        console.warn('Transaction not found:', transactionId);
+        console.error('❌ Transaction not found:', transactionId);
+        showToast("ไม่พบรายการนี้");
     }
 }
 
@@ -2643,17 +2848,31 @@ function renderCalendar() {
     const month = currentDate.getMonth();
     const keyPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
     
-    let monthTxs = transactions.filter(t => t.monthKey === keyPrefix);
+    let sourceTransactions = getCurrentTransactions();
+    let monthTxs = sourceTransactions.filter(t => t.monthKey === keyPrefix);
     
+    // ✅ แก้ไข: กรองตามบัญชี (ไม่แสดง transfer out ในบัญชีปลายทาง)
     if (accountFilterId !== 'all') {
-        monthTxs = monthTxs.filter(t => 
-            t.accountId === accountFilterId ||  
-            (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
-        );
+        const filterAccountId = accountFilterId;
+        
+        monthTxs = monthTxs.filter(t => {
+            // บัญชีต้นทาง: แสดงทุก transaction
+            if (t.accountId === filterAccountId) {
+                return true;
+            }
+            
+            // บัญชีปลายทาง: แสดงเฉพาะ internal_receive (ฝั่งรับ) เท่านั้น
+            // ไม่แสดง internal และ as_income (ฝั่งต้นทาง)
+            if (t.type === 'transfer' && t.transferToAccountId === filterAccountId) {
+                if (t.transferType === 'internal_receive') {
+                    return true;
+                }
+                // ❌ ไม่แสดง internal, as_income (transfer out)
+            }
+            
+            return false;
+        });
     }
-    
-    console.log(`📊 [CALENDAR] Using ${monthTxs.length} transactions (filter: ${accountFilterId})`);
-    
     
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -2668,32 +2887,33 @@ function renderCalendar() {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const dayTxs = monthTxs.filter(t => t.rawDate === dateStr);
         
-        console.log(`Day ${day}:`, {
-            date: dateStr,
-            transactions: dayTxs.length,
-            amounts: dayTxs.map(t => ({type: t.type, amount: t.amount})),
-            totalInc: dayTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0),
-            totalExp: dayTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+        // คำนวณรายรับและรายจ่าย (สำหรับจุดสี)
+        let incAmount = 0;
+        let expAmount = 0;
+        
+        dayTxs.forEach(t => {
+            if (t.type === 'income') {
+                incAmount += t.amount;
+            } else if (t.type === 'expense') {
+                expAmount += t.amount;
+            } else if (t.type === 'transfer') {
+                // internal_receive: นับเป็นรายรับ
+                if (t.transferType === 'internal_receive') {
+                    incAmount += t.amount;
+                }
+                // internal, as_income (ฝั่งต้นทาง): นับเป็นรายจ่าย
+                else if (t.transferType === 'internal' || t.transferType === 'as_income') {
+                    expAmount += t.amount;
+                }
+            }
         });
-
-
-const incAmount = dayTxs.filter(t => 
-    t.type === 'income' && 
-    !t.isTransferTransaction  
-).reduce((s, t) => s + t.amount, 0);
-
-const expAmount = dayTxs.filter(t => 
-    t.type === 'expense' && 
-    !t.isTransferTransaction  
-).reduce((s, t) => s + t.amount, 0);
         
-        
-const numbers = `
-    <div class="flex gap-1 mt-1">
-        ${incAmount > 0 ? '<div class="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>' : ''}
-        ${expAmount > 0 ? '<div class="w-1.5 h-1.5 rounded-full bg-rose-500"></div>' : ''}
-    </div>
-`;
+        const numbers = `
+            <div class="flex gap-1 mt-1">
+                ${incAmount > 0 ? '<div class="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>' : ''}
+                ${expAmount > 0 ? '<div class="w-1.5 h-1.5 rounded-full bg-rose-500"></div>' : ''}
+            </div>
+        `;
 
         grid.innerHTML += `
             <div onclick="openDayDetail('${dateStr}')" class="calendar-day bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl p-2 flex flex-col items-center justify-between hover:shadow-md transition-shadow">
@@ -2711,69 +2931,87 @@ async function openDayDetail(dateStr) {
     console.log(`📅 Opening day detail for ${dateStr}`);
     
     try {
-        let dayTxs = [];
-        
-        if (financeDB && financeDB.db) {
-            dayTxs = await financeDB.getTransactionsByDate(dateStr);
-            console.log(`💾 Loaded ${dayTxs.length} transactions from IndexedDB`);
-        } else {
-            dayTxs = transactions.filter(t => t.rawDate === dateStr);
-            console.log(`💾 Loaded ${dayTxs.length} transactions from memory`);
-        }
+        let sourceTransactions = getCurrentTransactions();
+        let dayTxs = sourceTransactions.filter(t => t.rawDate === dateStr);
         
         if (accountFilterId !== 'all') {
-            dayTxs = dayTxs.filter(t => 
-                t.accountId === accountFilterId || 
-                (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
-            );
-            console.log(`🎯 After account filter: ${dayTxs.length} transactions`);
+            const filterAccountId = accountFilterId;
+            
+            dayTxs = dayTxs.filter(t => {
+                if (t.accountId === filterAccountId) {
+                    return true;
+                }
+                
+                if (t.type === 'transfer' && t.transferToAccountId === filterAccountId) {
+                    if (t.transferType === 'internal_receive') {
+                        return true;
+                    }
+                }
+                
+                return false;
+            });
         }
+        
+        // คำนวณรายรับและรายจ่าย
+        let inc = 0;
+        let exp = 0;
+        
+        dayTxs.forEach(t => {
+            if (t.type === 'income') {
+                inc += t.amount;
+            } else if (t.type === 'expense') {
+                exp += t.amount;
+            } else if (t.type === 'transfer') {
+                if (t.transferType === 'internal_receive') {
+                    inc += t.amount;
+                } else if (t.transferType === 'internal' || t.transferType === 'as_income') {
+                    exp += t.amount;
+                }
+            }
+        });
+        
+        document.getElementById('detailDayInc').innerText = `฿${inc.toLocaleString()}`;
+        document.getElementById('detailDayExp').innerText = `฿${exp.toLocaleString()}`;
         
         dayTxs.sort((a, b) => {
             const timeA = new Date(a.createdAt || a.updatedAt || a.date || 0).getTime();
             const timeB = new Date(b.createdAt || b.updatedAt || b.date || 0).getTime();
-            return timeB - timeA; 
+            return timeB - timeA;
         });
-
-        if (dayTxs.length === 0) {
-            console.log(`ℹ️ No transactions found for ${dateStr}`);
-        } else if (dayTxs.length > transactions.filter(t => t.rawDate === dateStr).length) {
-            console.warn(`⚠️ Found ${dayTxs.length} transactions (more than in memory)`);
-        }
         
-        const displayDate = new Date(dateStr).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
-        document.getElementById('detailDateDisplay').innerText = displayDate;
-        
-        const inc = dayTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-        const exp = dayTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-        
-        document.getElementById('detailDayInc').innerText = `฿${inc.toLocaleString()}`;
-        document.getElementById('detailDayExp').innerText = `฿${exp.toLocaleString()}`;
-
         const container = document.getElementById('dayDetailList');
+        
         if (dayTxs.length === 0) {
             container.innerHTML = `<div class="p-8 text-center text-slate-400 italic text-xs">ไม่มีรายการสำหรับวันนี้</div>`;
         } else {
-            container.innerHTML = dayTxs
-    .filter(t => {
-        return accountFilterId === 'all' || 
-               (t.accountId === accountFilterId) ||
-               (t.type === 'transfer' && t.accountId === accountFilterId) ||
-               (t.type === 'income' && t.isTransferIncome && t.accountId === accountFilterId);
-    })
-    .map(t => {
+            container.innerHTML = dayTxs.map(t => {
                 const tag = t.tag ? `<span class="text-[10px] font-bold text-indigo-400 uppercase">[${t.tag}]</span> ` : '';
-                let timeInfo = '';
-                if (t.createdAt) {
-                    const time = new Date(t.createdAt);
-                    const hours = time.getHours().toString().padStart(2, '0');
-                    const minutes = time.getMinutes().toString().padStart(2, '0');
-                    timeInfo = `<span class="text-[7px] text-slate-400 ml-1">${hours}:${minutes}</span>`;
+                
+                let sign = '';
+                let amountClass = '';
+                
+                if (t.type === 'income') {
+                    sign = '+';
+                    amountClass = 'text-emerald-500';
+                } else if (t.type === 'expense') {
+                    sign = '-';
+                    amountClass = 'text-rose-500';
+                } else if (t.type === 'transfer') {
+                    if (t.transferType === 'internal_receive') {
+                        sign = '+';
+                        amountClass = 'text-emerald-500';
+                    } else {
+                        sign = '-';
+                        amountClass = 'text-rose-500';
+                    }
                 }
+                
+                // ✅ แก้ไข: ส่งแค่ transaction.id
                 const onClickAction = isMobile() 
-                    ? `onclick="showMobileActionModal(${JSON.stringify(t).replace(/"/g, '&quot;')})"`
+                    ? `onclick="showMobileActionModal('${t.id}')"`
                     : '';
-return `
+                
+                return `
                 <div ${onClickAction}
                      class="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700 group hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${isMobile() ? 'cursor-pointer' : ''}">
                     <div class="flex items-center gap-3">
@@ -2784,15 +3022,14 @@ return `
                         </div>
                     </div>
                     <div class="flex items-center gap-3">
-                        <p class="text-[14px] font-bold ${t.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}">
-                            ${t.type === 'income' ? '+' : '-'}฿${Math.abs(t.amount).toLocaleString()}
+                        <p class="font-bold text-[14px] ${amountClass}">
+                            ${sign}฿${Math.abs(t.amount).toLocaleString()}
                         </p>
-                        <!-- ⭐⭐ Desktop: แสดงปุ่มแก้ไข/ลบ, Mobile: ซ่อน ⭐⭐ -->
                         <div class="flex gap-1 ${isMobile() ? 'hidden' : 'opacity-0 group-hover:opacity-100 transition-opacity'}">
-                                    <button onclick="editDayTransaction('${t.id}', ${t.isDebtPayment ? 'true' : 'false'}, '${t.originalPaymentId || ''}')" 
+                            <button onclick="editDayTransaction('${t.id}', ${t.isDebtPayment ? 'true' : 'false'}, '${t.originalPaymentId || ''}')" 
                                     class="p-1 text-indigo-400 hover:bg-indigo-50 rounded" 
                                     title="แก้ไข">
-<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                 </svg>
                             </button>
@@ -2813,7 +3050,6 @@ return `
         
     } catch (error) {
         console.error('Error opening day detail:', error);
-        
         showToast("❌ โหลดข้อมูลไม่สำเร็จ: " + error.message);
         
         const displayDate = new Date(dateStr).toLocaleDateString('th-TH', { 
@@ -2887,22 +3123,32 @@ async function deleteDayTransaction(id, dateStr) {
             const isDebtPayment = transactionToDelete?.isDebtPayment;
             const originalPaymentId = transactionToDelete?.originalPaymentId;
             
-            const result = await financeDB.deleteTransaction(id);
+            // ✅ 1. ลบจาก backend (MySQL) ถ้า login และออนไลน์
+            if (isLoggedIn && navigator.onLine && !id.toString().startsWith('tx_')) {
+                console.log('📡 Calling deleteTransactionFromBackend for id:', id);
+                await deleteTransactionFromBackend(id);
+            } else if (isLoggedIn && !navigator.onLine) {
+                console.log('📱 Offline - adding to sync queue');
+                addToSyncQueue({ id: id }, 'delete');
+            }
             
-            console.log('Delete day transaction result:', result);
+            // ✅ 2. ลบจากเครื่อง
+            const result = await financeDB.deleteTransaction(id);
+            console.log('Delete result from financeDB:', result);
             
             if (result.success) {
+                // ลบจาก arrays
                 transactions = transactions.filter(t => t.id !== id);
+                if (backendTransactions && backendTransactions.length > 0) {
+                    backendTransactions = backendTransactions.filter(t => t.id !== id);
+                }
                 
+                // ลบ payment record
                 if (isDebtPayment && originalPaymentId) {
-                    console.log('🗑️ [Calendar] กำลังลบ payment record:', originalPaymentId);
-                    
                     const paymentIndex = payments.findIndex(p => p.id === originalPaymentId);
                     if (paymentIndex !== -1) {
                         payments.splice(paymentIndex, 1);
                         savePaymentsToStorage();
-                        
-                        console.log('✅ [Calendar] ลบ payment record สำเร็จ');
                     }
                 }
                 
@@ -2913,15 +3159,9 @@ async function deleteDayTransaction(id, dateStr) {
                 }
                 
                 renderCalendar();
-                
                 refreshAnalysisCharts();
                 
-                if (isDebtPayment) {
-                    showToast("🗑️ ลบรายการผ่อนหนี้จากปฏิทินสำเร็จ (ทั้งสองฝั่ง)");
-                } else {
-                    showToast("🗑️ ลบรายการจากปฏิทินสำเร็จ");
-                }
-                
+                showToast("✅ ลบรายการสำเร็จ");
             } else {
                 showToast("❌ ลบไม่สำเร็จ");
             }
@@ -2940,43 +3180,36 @@ async function deleteDayTransaction(id, dateStr) {
 
 function updateUI() {
     const key = getMonthKey(); 
-    console.log(`🔄 updateUI() - เดือน: ${key}, isLoggedIn: ${isLoggedIn}, isShowingBackendData: ${isShowingBackendData}`);
-    console.log(`📊 backendTransactions: ${backendTransactions.length} รายการ, transactions: ${transactions.length} รายการ`);
-    
-    let sourceTransactions = transactions;
-    
-    if (isLoggedIn) {
-        if (backendTransactions.length > 0) {
-            sourceTransactions = backendTransactions;
-            isShowingBackendData = true;
-            console.log(`📊 แสดงข้อมูลจาก backend: ${backendTransactions.length} รายการ`);
-        } else {
-            console.log('⚠️ backendTransactions ว่าง แต่ isLoggedIn = true');
-            sourceTransactions = transactions;
-            console.log(`📊 แสดงข้อมูลจาก local ชั่วคราว: ${transactions.length} รายการ`);
-        }
-    } else {
-        console.log(`📊 แสดงข้อมูลจาก local: ${transactions.length} รายการ`);
-    }
+
+    let sourceTransactions = getCurrentTransactions();
+
+    console.log(`🔄 updateUI() - เดือน: ${key}, isLoggedIn: ${isLoggedIn}`);
+    console.log(`📊 ข้อมูลที่ใช้: ${sourceTransactions.length} รายการ`);
     
     let filtered = sourceTransactions.filter(t => t.monthKey === key);
     console.log(`📊 หลังจากกรองเดือน ${key}: ${filtered.length} รายการ`);
     
-    if (filtered.length === 0 && sourceTransactions.length > 0) {
-        console.log('⚠️ ไม่มีรายการในเดือนนี้ แต่มีรายการทั้งหมด:', sourceTransactions.map(t => ({
-            id: t.id,
-            monthKey: t.monthKey,
-            date: t.rawDate || t.date,
-            amount: t.amount,
-            desc: t.desc
-        })));
-    }
-    
+    // ✅ กรองตามบัญชี
     if (accountFilterId !== 'all') {
-    filtered = filtered.filter(t => 
-        t.accountId === accountFilterId || 
-        (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
-    );
+    const filterAccountId = accountFilterId;
+    
+    filtered = filtered.filter(t => {
+        // บัญชีต้นทาง: แสดง transaction ที่ accountId ตรงกัน
+        if (t.accountId === filterAccountId) {
+            return true;
+        }
+        
+        // บัญชีปลายทาง: แสดงเฉพาะ transfer ที่เป็นฝั่งรับ (internal_receive เท่านั้น)
+        if (t.type === 'transfer' && t.transferToAccountId === filterAccountId) {
+            // ✅ เฉพาะ internal_receive
+            if (t.transferType === 'internal_receive') {
+                return true;
+            }
+            // ❌ ไม่แสดง as_income (ฝั่งต้นทาง) ในบัญชีปลายทาง
+        }
+        
+        return false;
+    });
 }
     
     filtered.sort((a, b) => {
@@ -2992,56 +3225,76 @@ function updateUI() {
         return dateB - dateA;
     });
 
-    const inc = filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-    const exp = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    // ✅ totalIncome: เฉพาะ income ปกติ + receive_income (as_income ฝั่งรับ)
+    const inc = filtered.filter(t => 
+        (t.type === 'income' && t.transferType !== 'internal_receive') ||
+        (t.type === 'income' && t.transferType === 'receive_income')
+    ).reduce((s, t) => s + t.amount, 0);
+    
+    // ✅ totalExpense: เฉพาะ expense
+    const exp = filtered.filter(t => 
+        t.type === 'expense'
+    ).reduce((s, t) => s + t.amount, 0);
     
     document.getElementById('totalIncome').innerText = `฿${inc.toLocaleString()}`;
     document.getElementById('totalExpense').innerText = `฿${exp.toLocaleString()}`;
     
-    let bal;
+    // ✅ คำนวณยอดคงเหลือ (bal)
+    let bal = 0;
+    
     if (accountFilterId === 'all') {
-        const realIncome = filtered.filter(t => 
-            t.type === 'income' && !t.isTransferIncome
-        ).reduce((s, t) => s + t.amount, 0);
-        bal = realIncome - exp;
+        let totalIncome = 0;
+        let totalExpense = 0;
+        
+        filtered.forEach(t => {
+            if (t.type === 'income') {
+                // ข้าม internal_receive เท่านั้น (as_income ฝั่งรับยังนับ)
+                if (t.transferType !== 'internal_receive') {
+                    totalIncome += t.amount;
+                }
+            } else if (t.type === 'expense') {
+                totalExpense += t.amount;
+            }
+        });
+        
+        bal = totalIncome - totalExpense;
     } else {
+        const filterAccountId = accountFilterId;
+        
+        // ✅ realIncome: income ปกติ + receive_income (as_income ฝั่งรับ)
         const realIncome = filtered.filter(t => 
             t.type === 'income' && 
-            t.accountId === accountFilterId &&
-            !t.isTransferIncome
+            t.accountId === filterAccountId &&
+            t.transferType !== 'internal_receive'
         ).reduce((s, t) => s + t.amount, 0);
         
         const expense = filtered.filter(t => 
             t.type === 'expense' && 
-            t.accountId === accountFilterId
+            t.accountId === filterAccountId
         ).reduce((s, t) => s + t.amount, 0);
         
+        // ✅ transfersOut: เฉพาะฝั่งต้นทาง (internal, as_income)
         const transfersOut = filtered.filter(t => 
             t.type === 'transfer' && 
-            t.accountId === accountFilterId
+            t.accountId === filterAccountId &&
+            (t.transferType === 'internal' || t.transferType === 'as_income')
         ).reduce((s, t) => s + t.amount, 0);
         
+        // ✅ transfersIn: เฉพาะฝั่งรับ (internal_receive)
         const transfersIn = filtered.filter(t => 
             t.type === 'transfer' && 
-            t.transferToAccountId === accountFilterId
+            t.accountId === filterAccountId &&
+            t.transferType === 'internal_receive'
         ).reduce((s, t) => s + t.amount, 0);
         
         bal = realIncome - expense - transfersOut + transfersIn;
     }
     
-async function refreshDataAfterSave() {
-    if (isLoggedIn && navigator.onLine) {
-        await loadTransactionsFromBackend();
-        isShowingBackendData = true;
-        updateUI();
-    }
-}
-
     const balEl = document.getElementById('totalBalance');
     balEl.innerText = `฿${Math.abs(bal).toLocaleString()}`; 
     balEl.style.color = bal < 0 ? '#FB7185' : '#34D399';
     
-    const list = document.getElementById('historyList');
+      const list = document.getElementById('historyList');
     
     if(filtered.length === 0) { 
         list.innerHTML = `<div class="p-8 text-center text-slate-300 text-xs italic">ไม่มีรายการ</div>`; 
@@ -3063,8 +3316,31 @@ async function refreshDataAfterSave() {
                 const monthName = dateObj.toLocaleDateString('th-TH', { month: 'short' });
                 
                 const dailyTransactions = filtered.filter(item => (item.rawDate || item.date) === transactionDate);
-                const dailyIncome = dailyTransactions.filter(item => item.type === 'income').reduce((sum, item) => sum + item.amount, 0);
-                const dailyExpense = dailyTransactions.filter(item => item.type === 'expense').reduce((sum, item) => sum + item.amount, 0);
+
+                let dailyIncome = 0;
+                let dailyExpense = 0;
+
+                dailyTransactions.forEach(item => {
+                    if (item.type === 'income') {
+                        // income ปกติ และ receive_income (as_income ฝั่งรับ)
+                        dailyIncome += item.amount;
+                    } else if (item.type === 'expense') {
+                        dailyExpense += item.amount;
+                    } else if (item.type === 'transfer') {
+                        // internal_receive: นับเป็นรายรับ (สำหรับ daily summary)
+                        if (item.transferType === 'internal_receive') {
+                            dailyIncome += item.amount;
+                        }
+                        // as_income (ฝั่งต้นทาง): นับเป็นรายจ่าย
+                        else if (item.transferType === 'as_income') {
+                            dailyExpense += item.amount;
+                        }
+                        // internal (ฝั่งต้นทาง): นับเป็นรายจ่าย
+                        else if (item.transferType === 'internal') {
+                            dailyExpense += item.amount;
+                        }
+                    }
+                });
                 
                 html += `
                 <div class="sticky top-0 z-10 bg-slate-900/95 dark:bg-slate-900/95 backdrop-blur-sm px-4 py-3 border-b border-slate-800 dark:border-slate-800">
@@ -3092,6 +3368,25 @@ async function refreshDataAfterSave() {
                 ? `onclick="showMobileActionModal(${JSON.stringify(t).replace(/"/g, '&quot;')})"`
                 : '';
             
+            let sign = '';
+            let amountClass = '';
+            
+            if (t.type === 'income') {
+                sign = '+';
+                amountClass = 'text-emerald-400';
+            } else if (t.type === 'expense') {
+                sign = '-';
+                amountClass = 'text-rose-400';
+            } else if (t.type === 'transfer') {
+                if (t.transferType === 'internal_receive') {
+                    sign = '+';
+                    amountClass = 'text-emerald-400';
+                } else {
+                    sign = '-';
+                    amountClass = 'text-rose-400';
+                }
+            }
+            
             html += `
             <div class="px-4 py-3 flex justify-between items-center group hover:bg-slate-50 transition-colors dark:hover:bg-slate-800/50 history-item" 
                  data-transaction-id="${t.id}" 
@@ -3104,8 +3399,8 @@ async function refreshDataAfterSave() {
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
-                    <p class="font-bold text-[14px] ${t.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}">
-                        ${t.type === 'income' ? '+' : '-'}฿${Math.abs(t.amount).toLocaleString()}
+                    <p class="font-bold text-[14px] ${amountClass}">
+                        ${sign}฿${Math.abs(t.amount).toLocaleString()}
                     </p>
                     <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex">
                         <button onclick="editTransaction('${t.id}')" class="p-1 text-indigo-400 hover:text-indigo-600" title="แก้ไข">
@@ -3132,9 +3427,19 @@ async function refreshDataAfterSave() {
     if (isOverviewPage && isCalendarTabActive) {
         renderCalendar();
     }
+    setTimeout(() => {
+        bindHistoryItemEvents();
+    }, 100);
 }
 
-
+    // ✅ ฟังก์ชัน refreshDataAfterSave (ย้ายไปอยู่นอกการคำนวณ bal)
+    async function refreshDataAfterSave() {
+        if (isLoggedIn && navigator.onLine) {
+            await loadTransactionsFromBackend();
+            isShowingBackendData = true;
+            updateUI();
+        }
+    }
 
 function calculateTotalBudget(targets, income, mode) {
     let totalSpending = 0;
@@ -3195,13 +3500,18 @@ totalInvestment = adjustedIncome * (investPct / 100);
 function updateBudgetUI() {
     const key = getMonthKey(); 
     
-    let filtered = transactions.filter(t => t.monthKey === key);
+    let sourceTransactions = getCurrentTransactions();
+    let filtered = sourceTransactions.filter(t => t.monthKey === key);
     
-   if (accountFilterId !== 'all') {
-        filtered = filtered.filter(t => 
-            t.accountId === accountFilterId ||  
-            (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
-        );
+    if (accountFilterId !== 'all') {
+        filtered = filtered.filter(t => {
+            // ✅ แปลงให้เป็น string ก่อนเปรียบเทียบ
+            const txAccountId = t.accountId ? t.accountId.toString() : null;
+            const filterAccountId = accountFilterId.toString();
+            
+            return txAccountId === filterAccountId || 
+                   (t.type === 'transfer' && t.transferToAccountId?.toString() === filterAccountId);
+        });
     }
     let income = 0;
     
@@ -3484,6 +3794,8 @@ function getAnalysisData() {
     }
 
     const targetMonthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+    let sourceTransactions = getCurrentTransactions();
     
     console.log("📅 Date Range:", {
         targetMonthKey,
@@ -3492,13 +3804,18 @@ function getAnalysisData() {
         analysisPeriod
     });
     
-    let filtered = transactions.filter(t => 
+  let filtered = sourceTransactions.filter(t => 
         t.monthKey === targetMonthKey && 
         (t.type === 'income' || t.type === 'expense')
     );
     
-    if (accountFilterId !== 'all') {
-        filtered = filtered.filter(t => t.accountId === accountFilterId);  
+     if (accountFilterId !== 'all') {
+        filtered = filtered.filter(t => {
+            // ✅ แปลงให้เป็น string ก่อนเปรียบเทียบ
+            const txAccountId = t.accountId ? t.accountId.toString() : null;
+            const filterAccountId = accountFilterId.toString();
+            return txAccountId === filterAccountId;
+        });
     }
     
     console.log("📝 Filtered Transactions:", filtered.length);
@@ -5700,13 +6017,15 @@ function updateYearlyUI() {
     
     const dCat = {};
     [...customCategories.spending, ...customCategories.investment].forEach(c => dCat[c.label] = Array(12).fill(0));
+
+    let sourceTransactions = getCurrentTransactions();
     
     const filteredTransactions = accountFilterId !== 'all' 
-        ? transactions.filter(t => 
+        ? sourceTransactions.filter(t => 
             t.accountId === accountFilterId ||  
             (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
           )
-        : transactions;
+        : sourceTransactions;
     
     filteredTransactions.forEach(t => { 
         const parts = t.monthKey.split('-');
@@ -5944,13 +6263,15 @@ function updateYearlyUI() {
 
 function updateYearlyTagsUI() {
     const tagData = {};
+
+    let sourceTransactions = getCurrentTransactions();
     
 const filteredTransactions = accountFilterId !== 'all' 
-        ? transactions.filter(t => 
+        ? sourceTransactions.filter(t => 
             t.accountId === accountFilterId ||  
             (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
           )
-        : transactions;
+        : sourceTransactions;
     
 filteredTransactions.forEach(t => {
     const parts = t.monthKey.split('-');
@@ -5996,19 +6317,177 @@ let tags = JSON.parse(localStorage.getItem('fin_tags')) || [];
 
 
 function renderDebtPage() {
-    console.log('renderDebtPage called');
-    console.log('debts array:', debts);
-    console.log('debts count:', debts.length); 
+    console.log('📄 renderDebtPage called');
+    console.log('📊 debts array:', debts);
+    console.log('📊 payments array:', payments);
+    console.log('📊 debts count:', debts.length);
+    console.log('📊 payments count:', payments.length);
     
     updateDebtSummary();
     switchDebtTab(currentDebtTab);
+    
+    // ✅ เรียก renderPaymentHistory โดยตรง
+    renderPaymentHistory();
 }
 
-
-async function saveDebtPaymentToBackend(paymentData) {
-    if (!isLoggedIn || !navigator.onLine) return false;
+async function savePayment() {
+    // ✅ 1. ดึงค่าจาก DOM elements ก่อน
+    const accountId = document.getElementById('paymentAccountSelect').value;
+    const amount = parseFloat(document.getElementById('paymentAmount').value);
+    const date = document.getElementById('paymentDate').value;
+    const note = document.getElementById('paymentNote').value.trim();
+    
+    // ✅ 2. ตรวจสอบความถูกต้อง
+    if (!accountId) {
+        showToast('⚠️ กรุณาเลือกบัญชีที่ใช้ชำระ');
+        return;
+    }
+    
+    if (!amount || amount <= 0) {
+        showToast('⚠️ กรุณาระบุจำนวนเงินที่ถูกต้อง');
+        return;
+    }
+    
+    if (!date) {
+        showToast('⚠️ กรุณาเลือกวันที่ชำระ');
+        return;
+    }
+    
+    // ✅ 3. ตรวจสอบ debt object
+    if (!window.currentDebtForPayment) {
+        showToast('❌ ไม่พบข้อมูลหนี้');
+        return;
+    }
+    
+    const debt = window.currentDebtForPayment;
+    const shouldSaveToLocal = saveToLocalEnabled;
+    const paymentId = 'payment_' + Date.now();  // temporary ID
     
     try {
+        // ✅ 4. บันทึก payment ก่อน (ได้ ID จริง)
+        console.log('📤 Step 1: Saving payment to backend...');
+        const paymentResult = await saveDebtPaymentToBackend({
+            id: paymentId,
+            debtId: selectedDebtForPayment,
+            accountId: accountId,
+            amount: amount,
+            date: date,
+            note: note
+        });
+        
+        if (!paymentResult || !paymentResult.id) {
+            showToast('❌ ไม่สามารถบันทึกการชำระหนี้ได้');
+            return;
+        }
+        
+        const realPaymentId = paymentResult.id;
+        console.log(`✅ Payment saved with real ID: ${realPaymentId}`);
+        
+        // ✅ 5. สร้าง transaction ด้วย realPaymentId
+        const now = new Date();
+        const expenseData = {
+            id: 'debt_expense_' + Date.now(),
+            amount: amount,
+            type: 'expense',
+            category: debt.categoryName,
+            icon: debt.categoryIcon,
+            desc: debt.name + ' (ผ่อนหนี้)',
+            tag: debt.tag || '#ผ่อนหนี้',
+            rawDate: date,
+            monthKey: getMonthKeyFromDate(date),
+            date: date,
+            accountId: accountId,
+            isDebtPayment: true,
+            originalDebtId: debt.id,
+            originalPaymentId: realPaymentId,
+            createdAt: now.toISOString(),
+            updatedAt: now.toISOString(),
+            owner_type: isLoggedIn ? 'user' : 'guest',
+            owner_id: isLoggedIn ? currentUser.id : getGuestId()
+        };
+        
+        console.log('📤 Step 2: Creating transaction with real payment ID...');
+        
+        let transactionResult;
+        if (isLoggedIn) {
+            transactionResult = await saveTransactionToBackend(expenseData);
+        } else {
+            await saveGuestTransaction(expenseData);
+            transactionResult = { success: true, id: expenseData.id };
+        }
+        
+        if (!transactionResult || !transactionResult.success) {
+            throw new Error('บันทึก transaction ไม่สำเร็จ');
+        }
+        
+        // ✅ 6. อัปเดต payments array ใน memory
+        const existingPaymentIndex = payments.findIndex(p => p.id === paymentId);
+        if (existingPaymentIndex !== -1) {
+            payments[existingPaymentIndex] = {
+                ...payments[existingPaymentIndex],
+                id: realPaymentId,
+                backendId: realPaymentId
+            };
+        } else {
+            payments.push({
+                id: realPaymentId,
+                debtId: selectedDebtForPayment,
+                accountId: accountId,
+                amount: amount,
+                date: date,
+                note: note,
+                backendId: realPaymentId,
+                createdAt: now.toISOString()
+            });
+        }
+        
+        // ✅ 7. บันทึก local storage (ถ้าเปิดใช้งาน)
+        if (shouldSaveToLocal) {
+            savePaymentsToStorage();
+        }
+        
+        // ✅ 8. โหลดข้อมูลทั้งหมดจาก backend ใหม่ (สำคัญที่สุด!)
+        console.log('🔄 Reloading all data from backend...');
+        await Promise.all([
+            loadTransactionsFromBackend(),  // ✅ โหลด transaction ใหม่
+            loadDebtsFromBackend(),          // ✅ โหลด debts ใหม่ (เผื่อยอดเปลี่ยน)
+            loadPaymentsFromBackend()        // ✅ โหลด payments ใหม่
+        ]);
+        
+        // ✅ 9. อัปเดต transactions array
+        transactions = backendTransactions;
+        
+        // ✅ 10. รีเฟรช UI ทั้งหมด
+        closePaymentModal();
+        renderDebtPage();
+        updateUI();           // ✅ อัปเดตหน้า overview
+        renderCalendar();     // ✅ อัปเดตปฏิทิน
+        refreshAnalysisCharts(); // ✅ อัปเดตกราฟ
+        
+        showToast(`✅ บันทึกการชำระหนี้สำเร็จ (฿${amount.toLocaleString()})`);
+        
+    } catch (error) {
+        console.error('❌ Error in savePayment:', error);
+        showToast(`❌ บันทึกไม่สำเร็จ: ${error.message}`);
+    }
+}
+
+async function saveDebtPaymentToBackend(paymentData) {
+    if (!isLoggedIn || !navigator.onLine) {
+        // ถ้า offline และบันทึก local ได้
+        if (saveToLocalEnabled) {
+            // เก็บไว้ในคิวซิงค์
+            addToSyncQueue(paymentData, 'create_payment');
+            showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
+            // ส่งกลับ temporary ID
+            return { id: paymentData.id, success: true, offline: true };
+        }
+        return { success: false, error: 'Offline and save to local disabled' };
+    }
+    
+    try {
+        console.log('📤 Saving payment to backend:', paymentData);
+        
         const response = await fetch(`${API_URL}/debt-payments`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -6022,32 +6501,60 @@ async function saveDebtPaymentToBackend(paymentData) {
             })
         });
         
+        // ✅ อ่าน response body ก่อน
         const result = await response.json();
         
-        if (response.ok && result.id && paymentData.id.startsWith('payment_')) {
-            const index = payments.findIndex(p => p.id === paymentData.id);
-            if (index !== -1) {
-                payments[index].id = result.id.toString();
-                payments[index].backendId = result.id;
-                savePaymentsToStorage();
-            }
+        if (!response.ok) {
+            console.error('❌ Backend error response:', result);
+            throw new Error(result.error || 'Failed to save payment');
         }
         
-        return response.ok;
+        if (result && result.id) {
+            console.log('✅ Payment saved to backend, id:', result.id);
+            
+            // ✅ ส่งกลับ ID จริง
+            return {
+                success: true,
+                id: result.id.toString(),
+                message: result.message
+            };
+        } else {
+            throw new Error('No ID returned from backend');
+        }
+        
     } catch (error) {
-        console.error('Error saving payment:', error);
-        return false;
+        console.error('❌ Error saving payment:', error);
+        
+        // ถ้า error แต่ saveToLocalEnabled = true ให้เก็บในคิว
+        if (saveToLocalEnabled) {
+            addToSyncQueue(paymentData, 'create_payment');
+            showToast('📦 เกิดข้อผิดพลาด แต่บันทึกไว้ในคิวซิงค์', 'info');
+            return { id: paymentData.id, success: true, offline: true, error: error.message };
+        }
+        
+        return {
+            success: false,
+            error: error.message
+        };
     }
 }
 
 async function updateDebtPaymentInBackend(paymentData) {
     if (!isLoggedIn || !navigator.onLine) return false;
     
+    // ถ้าเป็น temporary ID ให้บันทึกใหม่เลย
     if (paymentData.id.toString().startsWith('payment_')) {
         return saveDebtPaymentToBackend(paymentData);
     }
     
     try {
+        console.log('📤 Updating payment in backend:', {
+            id: paymentData.id,
+            amount: paymentData.amount,
+            date: paymentData.date,
+            accountId: paymentData.accountId
+        });
+        
         const response = await fetch(`${API_URL}/debt-payments/${paymentData.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -6060,7 +6567,15 @@ async function updateDebtPaymentInBackend(paymentData) {
             })
         });
         
-        return response.ok;
+        if (response.ok) {
+            const result = await response.json();
+            console.log('✅ Payment updated in backend successfully:', result);
+            return true;
+        } else {
+            const result = await response.json();
+            console.error('Failed to update payment:', result);
+            return false;
+        }
     } catch (error) {
         console.error('Error updating payment:', error);
         return false;
@@ -6077,7 +6592,13 @@ async function deleteDebtPaymentFromBackend(paymentId) {
             method: 'DELETE'
         });
         
-        return response.ok;
+        if (response.ok) {
+            console.log('✅ ลบ payment record จาก MySQL สำเร็จ');
+            return true;
+        } else {
+            console.error('Failed to delete payment from backend:', response.status);
+            return false;
+        }
     } catch (error) {
         console.error('Error deleting payment:', error);
         return false;
@@ -6299,22 +6820,162 @@ function renderClosedDebtsList() {
 
 function deleteClosedDebt(debtId) {
     const debt = debts.find(d => d.id === debtId);
-    if (!debt || debt.status !== 'closed') return;
+    if (!debt || debt.status !== 'closed') {
+        showToast('❌ ไม่พบรายการหนี้ที่ปิดแล้ว');
+        return;
+    }
+    
+    const debtName = debt.name;
+    const shouldSaveToLocal = saveToLocalEnabled;
     
     showConfirm(
         'ลบรายการหนี้ที่ปิดแล้ว?',
-        `ลบรายการหนี้ "${debt.name}" จากรายการที่ปิดแล้ว\n` +
-        '📝 หมายเหตุ: การชำระเงินและ transaction ยังคงอยู่',
-        () => {
-            debts = debts.filter(d => d.id !== debtId);
-            saveDebtsToStorage();
+        `ลบรายการหนี้ "${debtName}" ที่ปิดแล้ว\n⚠️ รายการในหน้าหลักจะเปลี่ยนเป็นรายการทั่วไป (ไม่ใช่รายการผ่อนหนี้)\n\n❌ ลบแล้วไม่สามารถกู้คืนได้!`,
+        async () => {
+            console.log('🗑️ deleteClosedDebt START - Delete payments, then debt, then update transactions');
             
-            if (currentDebtTab === 'closed') {
-                renderClosedDebtsList();
+            // ============================================
+            // 0. โหลด transactions ล่าสุด
+            // ============================================
+            console.log('🔄 Loading latest transactions...');
+            if (isLoggedIn && navigator.onLine) {
+                await loadTransactionsFromBackend();
+                console.log(`✅ Loaded ${transactions.length} transactions from backend`);
             }
             
-            updateDebtSummary();
-            showToast(`🗑️ ลบรายการหนี้ "${debt.name}" จากรายการปิดสำเร็จ`);
+            // Debug: แสดง transactions ทั้งหมดที่มี originalDebtId
+            console.log('🔍 All transactions with originalDebtId:');
+            transactions.forEach(t => {
+                if (t.originalDebtId) {
+                    console.log(`   - id: ${t.id}, originalDebtId: ${t.originalDebtId} (type: ${typeof t.originalDebtId}), isDebtPayment: ${t.isDebtPayment}`);
+                }
+            });
+            
+            // หา payments ที่เกี่ยวข้อง
+            const relatedPayments = payments.filter(p => p.debtId === debtId);
+            
+            // ✅ หา transactions ที่เกี่ยวข้อง (แบบครอบคลุมทุกกรณี)
+            const debtIdStr = String(debtId);
+            const debtIdNum = Number(debtId);
+            
+            const relatedTransactions = transactions.filter(t => {
+                // ตรวจสอบว่าเป็น debt payment
+                if (!t.isDebtPayment) return false;
+                
+                // ตรวจสอบ originalDebtId (รองรับทั้ง string และ number)
+                const txDebtId = t.originalDebtId;
+                if (txDebtId === null || txDebtId === undefined) return false;
+                
+                // เปรียบเทียบแบบไม่สนใจชนิด
+                return String(txDebtId) === debtIdStr || Number(txDebtId) === debtIdNum;
+            });
+            
+            console.log(`   Found ${relatedPayments.length} payments to delete`);
+            console.log(`   Found ${relatedTransactions.length} transactions to update`);
+            console.log('   Transaction IDs:', relatedTransactions.map(t => t.id));
+            console.log('   Transaction originalDebtIds:', relatedTransactions.map(t => t.originalDebtId));
+            
+            // ============================================
+            // 1. ลบ payments
+            // ============================================
+            for (const payment of relatedPayments) {
+                console.log(`🗑️ Deleting payment: ${payment.id} (${payment.amount} บาท)`);
+                
+                if (isLoggedIn && navigator.onLine) {
+                    await deleteDebtPaymentFromBackend(payment.id);
+                    console.log(`   ✅ Payment ${payment.id} deleted from MySQL`);
+                } else if (isLoggedIn && !navigator.onLine && shouldSaveToLocal) {
+                    addToSyncQueue({ id: payment.id, debtId: debtId }, 'delete_payment');
+                    console.log(`   📱 Payment ${payment.id} added to sync queue`);
+                }
+            }
+            
+            payments = payments.filter(p => p.debtId !== debtId);
+            console.log(`✅ Removed ${relatedPayments.length} payments from payments array`);
+            
+            // ============================================
+            // 2. อัปเดต transactions
+            // ============================================
+            for (const transaction of relatedTransactions) {
+                console.log(`🔄 Updating transaction: ${transaction.id} (isDebtPayment: ${transaction.isDebtPayment} → 0)`);
+                
+                const updatedTransaction = {
+                    ...transaction,
+                    isDebtPayment: false,
+                    originalDebtId: null,
+                    originalPaymentId: null,
+                    desc: (transaction.desc || '').replace(' (ผ่อนหนี้)', '').replace('(ผ่อนหนี้)', '').trim(),
+                    updatedAt: new Date().toISOString()
+                };
+                
+                console.log(`   New description: "${updatedTransaction.desc}"`);
+                
+                if (isLoggedIn && navigator.onLine) {
+                    await updateTransactionInBackend(updatedTransaction);
+                    console.log(`   ✅ Transaction ${transaction.id} updated in MySQL`);
+                } else if (isLoggedIn && !navigator.onLine && shouldSaveToLocal) {
+                    addToSyncQueue(updatedTransaction, 'update');
+                    console.log(`   📱 Transaction ${transaction.id} added to sync queue`);
+                }
+                
+                // อัปเดต local arrays
+                const txIndex = transactions.findIndex(t => t.id === transaction.id);
+                if (txIndex !== -1) transactions[txIndex] = updatedTransaction;
+                
+                if (backendTransactions) {
+                    const backendIndex = backendTransactions.findIndex(t => t.id === transaction.id);
+                    if (backendIndex !== -1) backendTransactions[backendIndex] = updatedTransaction;
+                }
+                
+                if (shouldSaveToLocal) {
+                    await financeDB.saveTransaction(updatedTransaction);
+                }
+            }
+            console.log(`✅ Updated ${relatedTransactions.length} transactions (isDebtPayment: 1 → 0)`);
+            
+            // ============================================
+            // 3. ลบ debt
+            // ============================================
+            if (isLoggedIn && navigator.onLine) {
+                console.log('🌐 Deleting debt from MySQL...');
+                const success = await deleteDebtFromBackend(debtId);
+                if (success) {
+                    console.log('✅ Debt deleted from MySQL successfully');
+                } else {
+                    console.error('❌ Failed to delete debt from MySQL');
+                    showToast('⚠️ ลบจาก MySQL ไม่สำเร็จ', 'warning');
+                }
+            } else if (isLoggedIn && !navigator.onLine && shouldSaveToLocal) {
+                console.log('📱 Offline - adding debt deletion to sync queue');
+                addToSyncQueue({ id: debtId, type: 'delete_debt' }, 'delete_debt');
+                showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
+            } else if (isLoggedIn && !navigator.onLine && !shouldSaveToLocal) {
+                showToast('❌ ไม่สามารถลบได้ (ต้อง online หรือติ๊ก "บันทึกลงเครื่อง")', 'error');
+                hideConfirm();
+                return;
+            }
+            
+            // ลบ debt จาก local array
+            const debtIndex = debts.findIndex(d => d.id === debtId);
+            if (debtIndex !== -1) {
+                debts.splice(debtIndex, 1);
+                console.log('✅ Debt removed from debts array');
+            }
+            
+            // บันทึก localStorage
+            if (shouldSaveToLocal) {
+                saveDebtsToStorage();
+                savePaymentsToStorage();
+                console.log('💾 Debts and Payments saved to localStorage');
+            }
+            
+            // รีเฟรช UI
+            renderDebtPage();
+            updateUI();
+            renderCalendar();
+            refreshAnalysisCharts();
+            
+            showToast(`🗑️ ลบหนี้ "${debtName}" สำเร็จ (${relatedTransactions.length} รายการในหน้าหลักเปลี่ยนเป็นรายการทั่วไปแล้ว)`);
             hideConfirm();
         }
     );
@@ -6322,48 +6983,145 @@ function deleteClosedDebt(debtId) {
 
 function deleteActiveDebt(debtId) {
     const debt = debts.find(d => d.id === debtId);
-    if (!debt || debt.status !== 'open') return;
+    if (!debt || debt.status !== 'open') {
+        showToast('❌ ไม่พบรายการหนี้ที่กำลังผ่อน');
+        return;
+    }
+    
+    const debtName = debt.name;
+    const shouldSaveToLocal = saveToLocalEnabled;
     
     showConfirm(
         'ลบรายการหนี้?',
-        `ลบหนี้ "${debt.name}" และ transaction ที่เกี่ยวข้องทั้งหมด\n` +
-        '⚠️ ลบแล้วจะกู้คืนไม่ได้',
+        `⚠️ ลบหนี้ "${debtName}" แบบถาวร\n📊 จะลบประวัติการชำระและรายการในหน้าหลักทั้งหมด\n\n❌ ลบแล้วไม่สามารถกู้คืนได้!`,
         async () => {
+            console.log('🗑️ deleteActiveDebt START - Delete payments, transactions, then debt');
+            
+            // ============================================
+            // 0. โหลด transactions ล่าสุดก่อน (สำคัญมาก!)
+            // ============================================
+            console.log('🔄 Loading latest transactions...');
             if (isLoggedIn && navigator.onLine) {
-                await deleteDebtFromBackend(debtId);
+                await loadTransactionsFromBackend();
+                console.log(`✅ Loaded ${transactions.length} transactions from backend`);
             }
             
-            debts = debts.filter(d => d.id !== debtId);
+            // Debug: แสดง transactions ทั้งหมดที่มี originalDebtId
+            console.log('🔍 All transactions with originalDebtId:');
+            transactions.forEach(t => {
+                if (t.originalDebtId) {
+                    console.log(`   - id: ${t.id}, originalDebtId: ${t.originalDebtId} (type: ${typeof t.originalDebtId}), isDebtPayment: ${t.isDebtPayment}`);
+                }
+            });
             
+            // หา payments และ transactions ที่เกี่ยวข้อง
             const relatedPayments = payments.filter(p => p.debtId === debtId);
-            payments = payments.filter(p => p.debtId !== debtId);
             
-            if (relatedPayments.length > 0) {
-                try {
-                    const relatedExpenses = transactions.filter(t => 
-                        t.isDebtPayment && t.originalDebtId === debtId
-                    );
-                    
-                    for (const expense of relatedExpenses) {
-                        await financeDB.deleteTransaction(expense.id);
-                    }
-                    
-                    transactions = transactions.filter(t => 
-                        !(t.isDebtPayment && t.originalDebtId === debtId)
-                    );
-                } catch (error) {
-                    console.error('❌ ไม่สามารถลบ expenses ที่เกี่ยวข้อง:', error);
+            // หา transactions แบบครอบคลุม (string และ number)
+            const debtIdStr = String(debtId);
+            const debtIdNum = Number(debtId);
+            
+            const relatedTransactions = transactions.filter(t => {
+                if (!t.isDebtPayment) return false;
+                const txDebtId = t.originalDebtId;
+                if (txDebtId === null || txDebtId === undefined) return false;
+                return String(txDebtId) === debtIdStr || Number(txDebtId) === debtIdNum;
+            });
+            
+            console.log(`   Found ${relatedPayments.length} payments to delete`);
+            console.log(`   Found ${relatedTransactions.length} transactions to delete`);
+            console.log('   Transaction IDs:', relatedTransactions.map(t => t.id));
+            
+            // ============================================
+            // 1. ลบ transactions ที่เกี่ยวข้อง (ก่อน)
+            // ============================================
+            for (const transaction of relatedTransactions) {
+                console.log(`🗑️ Deleting transaction: ${transaction.id} (${transaction.amount} บาท)`);
+                
+                if (isLoggedIn && navigator.onLine) {
+                    await deleteTransactionFromBackend(transaction.id);
+                    console.log(`   ✅ Transaction ${transaction.id} deleted from MySQL`);
+                }
+                
+                await financeDB.deleteTransaction(transaction.id);
+                
+                // ลบจาก array
+                const txIndex = transactions.findIndex(t => t.id === transaction.id);
+                if (txIndex !== -1) transactions.splice(txIndex, 1);
+                if (backendTransactions) {
+                    const backendIndex = backendTransactions.findIndex(t => t.id === transaction.id);
+                    if (backendIndex !== -1) backendTransactions.splice(backendIndex, 1);
                 }
             }
             
-            saveDebtsToStorage();
-            savePaymentsToStorage();
+            // ============================================
+            // 2. ลบ payments ที่เกี่ยวข้อง
+            // ============================================
+            for (const payment of relatedPayments) {
+                console.log(`🗑️ Deleting payment: ${payment.id} (${payment.amount} บาท)`);
+                
+                if (isLoggedIn && navigator.onLine) {
+                    await deleteDebtPaymentFromBackend(payment.id);
+                    console.log(`   ✅ Payment ${payment.id} deleted from MySQL`);
+                } else if (isLoggedIn && !navigator.onLine && shouldSaveToLocal) {
+                    addToSyncQueue({ id: payment.id, debtId: debtId }, 'delete_payment');
+                    console.log(`   📱 Payment ${payment.id} added to sync queue`);
+                }
+            }
             
+            // ลบ payments จาก array
+            payments = payments.filter(p => p.debtId !== debtId);
+            console.log(`✅ Removed ${relatedPayments.length} payments from payments array`);
+            
+            // ============================================
+            // 3. ลบ debt
+            // ============================================
+            if (isLoggedIn && navigator.onLine) {
+                console.log('🌐 Deleting debt from MySQL...');
+                const success = await deleteDebtFromBackend(debtId);
+                if (success) {
+                    console.log('✅ Debt deleted from MySQL successfully');
+                } else {
+                    console.error('❌ Failed to delete debt from MySQL');
+                    showToast('⚠️ ลบจาก MySQL ไม่สำเร็จ', 'warning');
+                }
+            } else if (isLoggedIn && !navigator.onLine && shouldSaveToLocal) {
+                console.log('📱 Offline - adding debt deletion to sync queue');
+                addToSyncQueue({ id: debtId, type: 'delete_debt' }, 'delete_debt');
+                showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
+            } else if (isLoggedIn && !navigator.onLine && !shouldSaveToLocal) {
+                showToast('❌ ไม่สามารถลบได้ (ต้อง online หรือติ๊ก "บันทึกลงเครื่อง")', 'error');
+                hideConfirm();
+                return;
+            }
+            
+            // ============================================
+            // 4. ลบ debt จาก local array
+            // ============================================
+            const debtIndex = debts.findIndex(d => d.id === debtId);
+            if (debtIndex !== -1) {
+                debts.splice(debtIndex, 1);
+                console.log('✅ Debt removed from debts array');
+            }
+            
+            // ============================================
+            // 5. บันทึก localStorage
+            // ============================================
+            if (shouldSaveToLocal) {
+                saveDebtsToStorage();
+                savePaymentsToStorage();
+                console.log('💾 Debts and Payments saved to localStorage');
+            }
+            
+            // ============================================
+            // 6. รีเฟรช UI
+            // ============================================
             renderDebtPage();
             updateUI();
+            renderCalendar();
             refreshAnalysisCharts();
             
-            showToast(`✅ ลบหนี้ "${debtToDelete.name}" และ transaction สำเร็จ`);
+            showToast(`🗑️ ลบหนี้ "${debtName}" และรายการที่เกี่ยวข้องทั้งหมดสำเร็จ`);
             hideConfirm();
         }
     );
@@ -6371,26 +7129,30 @@ function deleteActiveDebt(debtId) {
 
 function renderPaymentHistory() {
     const container = document.getElementById('paymentHistoryContainer');
-
     
+    if (!container) {
+        console.warn('⚠️ paymentHistoryContainer not found');
+        return;
+    }
+    
+    console.log(`📊 Rendering payment history, payments count: ${payments.length}`);
+    
+    // ✅ กรองเฉพาะ payments ที่มี debt อยู่ในระบบ
     const sortedPayments = [...payments]
         .filter(p => {
             const debt = debts.find(d => d.id === p.debtId);
-            return debt && debt.status === 'open'; 
+            if (!debt) {
+                console.log(`⚠️ Payment ${p.id} has no matching debt (debtId: ${p.debtId})`);
+                return false;
+            }
+            return debt.status === 'open';
         })
         .sort((a, b) => {
             const dateA = new Date(a.date || a.createdAt || 0);
             const dateB = new Date(b.date || b.createdAt || 0);
-            
-            if (dateA.getTime() === dateB.getTime()) {
-                const timeA = new Date(a.createdAt || 0).getTime();
-                const timeB = new Date(b.createdAt || 0).getTime();
-                return timeB - timeA; 
-            }
-            
-            return dateB - dateA; 
+            return dateB - dateA;
         })
-    .slice(0, 10); 
+        .slice(0, 10);
     
     if (sortedPayments.length === 0) {
         container.innerHTML = '<p class="text-center text-slate-400 text-sm py-4">ยังไม่มีประวัติการชำระ</p>';
@@ -6403,7 +7165,7 @@ function renderPaymentHistory() {
         const date = new Date(payment.date);
         const dateStr = date.toLocaleDateString('th-TH');
         
-return `
+        return `
         <div class="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/30 rounded-xl group hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors">
             <div>
                 <p class="font-bold text-sm dark:text-white">${debtName}</p>
@@ -6486,7 +7248,7 @@ function openEditDebtModal(debtId) {
     document.getElementById('debtModal').classList.remove('hidden');
 }
 
-function saveDebt() {
+async function saveDebt() {
     const name = document.getElementById('debtNameInput').value.trim();
     const categoryId = document.getElementById('debtCategorySelect').value;
     const tag = document.getElementById('debtTagInput').value.trim();
@@ -6512,44 +7274,67 @@ function saveDebt() {
         return;
     }
     
-    const debtData = {
-    id: editingDebtId || 'debt_' + Date.now(),
-    name,
-    categoryId,
-    categoryName: spendingCat.label,
-    categoryIcon: spendingCat.icon,
-    tag: tag || '#ผ่อนหนี้',
-    totalAmount,
-    monthlyPayment,
-    interestRate,
-    dueDate,
-    startDate,
-    status: 'open', 
-    closedAt: null,  
-    closingNote: '', 
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-};
+    // ✅ ตรวจสอบ saveToLocalEnabled
+    const shouldSaveToLocal = saveToLocalEnabled;
     
-      if (editingDebtId) {
+    const debtData = {
+        id: editingDebtId || 'debt_' + Date.now(),
+        name,
+        categoryId,
+        categoryName: spendingCat.label,
+        categoryIcon: spendingCat.icon,
+        tag: tag || '#ผ่อนหนี้',
+        totalAmount,
+        monthlyPayment,
+        interestRate,
+        dueDate,
+        startDate,
+        status: 'open', 
+        closedAt: null,  
+        closingNote: '', 
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    };
+    
+    if (editingDebtId) {
+        // แก้ไขหนี้
         const index = debts.findIndex(d => d.id === editingDebtId);
         if (index !== -1) {
             debts[index] = debtData;
         }
         
+        // บันทึก MySQL
         if (isLoggedIn && navigator.onLine) {
-            updateDebtInBackend(debtData);
+            await updateDebtInBackend(debtData);
+        } else if (isLoggedIn && !navigator.onLine && shouldSaveToLocal) {
+            addToSyncQueue(debtData, 'update_debt');
+            showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
+        }
+        
+        // ✅ บันทึก local เฉพาะเมื่อ shouldSaveToLocal = true
+        if (shouldSaveToLocal) {
+            saveDebtsToStorage();
         }
         
     } else {
+        // เพิ่มหนี้ใหม่
         debts.push(debtData);
         
+        // บันทึก MySQL
         if (isLoggedIn && navigator.onLine) {
-            saveDebtToBackend(debtData);
+            await saveDebtToBackend(debtData);
+        } else if (isLoggedIn && !navigator.onLine && shouldSaveToLocal) {
+            addToSyncQueue(debtData, 'create_debt');
+            showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
+        }
+        
+        // ✅ บันทึก local เฉพาะเมื่อ shouldSaveToLocal = true
+        if (shouldSaveToLocal) {
+            saveDebtsToStorage();
         }
     }
     
-    saveDebtsToStorage();
+    
     closeDebtModal();
     renderDebtPage();
     
@@ -6606,83 +7391,6 @@ function closePaymentModal() {
     resetPaymentModal(); 
 }
 
-async function savePayment() {
-    const accountId = document.getElementById('paymentAccountSelect').value;
-    const amount = parseFloat(document.getElementById('paymentAmount').value);
-    const date = document.getElementById('paymentDate').value;
-    const note = document.getElementById('paymentNote').value.trim();
-    
-    if (!amount || amount <= 0) {
-        showToast('กรุณาระบุจำนวนเงินที่ชำระ');
-        return;
-    }
-    
-    const paymentId = 'payment_' + Date.now();
-    const paymentData = {
-        id: paymentId,
-        debtId: selectedDebtForPayment,
-        accountId: accountId,
-        amount,
-        date,
-        note,
-        createdAt: new Date().toISOString()
-    };
-    
-    payments.push(paymentData);
-
-
-    if (isLoggedIn && navigator.onLine) {
-        await saveDebtPaymentToBackend(paymentData);
-    } else if (isLoggedIn && !navigator.onLine) {
-        addToSyncQueue(paymentData, 'create_payment');
-    }
-
-    
-    if (window.currentDebtForPayment) {
-        const debt = window.currentDebtForPayment;
-        const now = new Date();
-        const expenseData = {
-            id: 'debt_expense_' + Date.now(),
-            amount: amount,
-            type: 'expense',
-            category: debt.categoryName,
-            icon: debt.categoryIcon,
-            desc: debt.name + ' (ผ่อนหนี้)',
-            tag: debt.tag || '#ผ่อนหนี้',
-            rawDate: date,
-            monthKey: getMonthKeyFromDate(date),
-            date: date,
-            accountId: accountId, 
-            isDebtPayment: true, 
-            originalDebtId: debt.id,
-            originalPaymentId: paymentId,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        };
-        
-        try {
-            await financeDB.saveTransaction(expenseData);
-            
-            const exists = transactions.some(t => t.id === expenseData.id);
-            if (!exists) {
-                transactions.unshift(expenseData);
-            }
-            
-            console.log('✅ บันทึก expense สำหรับการผ่อนหนี้สำเร็จ:', expenseData);
-        } catch (error) {
-            console.error('❌ ไม่สามารถบันทึก expense:', error);
-        }
-    }
-    
-    savePaymentsToStorage();
-    closePaymentModal();
-    renderDebtPage();
-    
-    updateUI();
-    refreshAnalysisCharts();
-    
-    showToast(`✅ บันทึกการชำระหนี้สำเร็จ (฿${amount.toLocaleString()})`);
-}
 
 let editingPaymentId = null;
 
@@ -6728,7 +7436,7 @@ function editPayment(paymentId) {
 }
 
 async function updatePayment() {
-    const accountId = document.getElementById('paymentAccountSelect').value; 
+    const accountId = document.getElementById('paymentAccountSelect').value;
     const amount = parseFloat(document.getElementById('paymentAmount').value);
     const date = document.getElementById('paymentDate').value;
     const note = document.getElementById('paymentNote').value.trim();
@@ -6745,57 +7453,115 @@ async function updatePayment() {
     
     if (!editingPaymentId) return;
     
+    const shouldSaveToLocal = saveToLocalEnabled;
+    
     const paymentIndex = payments.findIndex(p => p.id === editingPaymentId);
     if (paymentIndex === -1) return;
     
     const payment = payments[paymentIndex];
     const debt = debts.find(d => d.id === payment.debtId);
     
+    if (!debt) {
+        showToast('❌ ไม่พบข้อมูลหนี้');
+        return;
+    }
+    
+    // ✅ 1. อัปเดต payment ใน memory
     payments[paymentIndex] = {
         ...payment,
-        accountId: accountId, 
-        amount,
-        date,
-        note,
+        accountId: accountId,
+        amount: amount,
+        date: date,
+        note: note,
         updatedAt: new Date().toISOString()
     };
     
-    if (debt) {
-        try {
-            const expense = transactions.find(t => 
-                t.originalPaymentId === editingPaymentId
-            );
-            
-            if (expense) {
-                const updatedExpense = {
-                    ...expense,
-                    accountId: accountId, 
-                    amount: amount,
-                    date: date,
-                    rawDate: date,
-                    desc: debt.name + ' (ผ่อนหนี้)',
-                    updatedAt: new Date().toISOString()
-                };
-                
-                await financeDB.saveTransaction(updatedExpense);
-                const expenseIndex = transactions.findIndex(t => t.id === expense.id);
-                if (expenseIndex !== -1) {
-                    transactions[expenseIndex] = updatedExpense;
-                }
-            }
-        } catch (error) {
-            console.error('❌ ไม่สามารถอัพเดต expense:', error);
+    // ✅ 2. บันทึก payment ไป MySQL
+    if (isLoggedIn && navigator.onLine) {
+        const paymentUpdateSuccess = await updateDebtPaymentInBackend(payments[paymentIndex]);
+        if (!paymentUpdateSuccess) {
+            payments[paymentIndex] = payment;
+            showToast('❌ อัปเดตการชำระไม่สำเร็จ');
+            return;
         }
+    } else if (isLoggedIn && !navigator.onLine && shouldSaveToLocal) {
+        addToSyncQueue(payments[paymentIndex], 'update_payment');
+        showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
     }
     
-    savePaymentsToStorage();
+    if (shouldSaveToLocal) {
+        savePaymentsToStorage();
+    }
+    
+    // ✅ 3. ค้นหาและอัปเดต expense transaction ที่เกี่ยวข้อง
+    try {
+        const expense = transactions.find(t => 
+            t.originalPaymentId === editingPaymentId || 
+            t.originalPaymentId === editingPaymentId.toString()
+        );
+        
+        if (expense) {
+            console.log('🔄 Found related transaction, updating:', expense.id);
+            
+            const updatedExpense = {
+                ...expense,
+                accountId: accountId,
+                amount: amount,
+                date: date,
+                rawDate: date,
+                desc: debt.name + ' (ผ่อนหนี้)',
+                updatedAt: new Date().toISOString(),
+                // ✅ สำคัญ: คงค่า isDebtPayment และ originalPaymentId ไว้
+                isDebtPayment: true,
+                originalPaymentId: editingPaymentId,
+                originalDebtId: debt.id
+            };
+            
+            // อัปเดต transaction
+            if (isLoggedIn) {
+                await updateTransactionInBackend(updatedExpense);
+            } else {
+                await financeDB.saveTransaction(updatedExpense);
+            }
+            
+            // อัปเดตใน memory
+            const expenseIndex = transactions.findIndex(t => t.id === expense.id);
+            if (expenseIndex !== -1) {
+                transactions[expenseIndex] = updatedExpense;
+            }
+            if (backendTransactions) {
+                const backendIndex = backendTransactions.findIndex(t => t.id === expense.id);
+                if (backendIndex !== -1) {
+                    backendTransactions[backendIndex] = updatedExpense;
+                }
+            }
+        } else {
+            console.warn('⚠️ No related transaction found for payment:', editingPaymentId);
+        }
+    } catch (error) {
+        console.error('❌ Error updating expense transaction:', error);
+        showToast('⚠️ อัปเดต payment สำเร็จ แต่ไม่สามารถอัปเดตรายการในหน้าหลักได้');
+    }
+    
+    // ✅ 4. โหลดข้อมูลใหม่ทั้งหมด
+    if (isLoggedIn && navigator.onLine) {
+        console.log('🔄 Reloading all data after update...');
+        await Promise.all([
+            loadTransactionsFromBackend(),
+            loadDebtsFromBackend(),
+            loadPaymentsFromBackend()
+        ]);
+        transactions = backendTransactions;
+    }
+    
+    // ✅ 5. รีเฟรช UI
     closePaymentModal();
     renderDebtPage();
-    
     updateUI();
+    renderCalendar();
     refreshAnalysisCharts();
     
-    showToast('อัปเดตการชำระสำเร็จ');
+    showToast('✅ อัปเดตการชำระสำเร็จ');
 }
 
 function resetPaymentModal() {
@@ -6824,41 +7590,51 @@ function deletePayment(paymentId) {
     
     showConfirm(
         'ลบรายการชำระหนี้?',
-        `ลบการชำระ ${payment.amount.toLocaleString()} บาท ของ "${debtName}"\nลบแล้วจะกู้คืนไม่ได้`,
+        `ลบการชำระ ${payment.amount.toLocaleString()} บาท ของ "${debtName}"\n` +
+        '⚠️ รายการในหน้าหลักจะถูกลบด้วย',
         async () => {
-
-
-            if (isLoggedIn && navigator.onLine) {
-                await deleteDebtPaymentFromBackend(paymentId);
-            }
-
-            if (debt) {
-                try {
-                    const expense = transactions.find(t => 
-                        t.originalPaymentId === paymentId || 
-                        (t.isDebtPayment && t.originalDebtId === debt.id && Math.abs(t.amount - payment.amount) < 0.01)
-                    );
-                    
-                    if (expense) {
-                        await financeDB.deleteTransaction(expense.id);
-                        
-                        transactions = transactions.filter(t => t.id !== expense.id);
-                        
-                        console.log('✅ ลบ expense สำหรับการผ่อนหนี้สำเร็จ');
-                    }
-                } catch (error) {
-                    console.error('❌ ไม่สามารถลบ expense:', error);
+            // ✅ 1. ค้นหา transaction ที่เกี่ยวข้อง
+            const expense = transactions.find(t => 
+                t.originalPaymentId === paymentId || 
+                t.originalPaymentId === paymentId.toString()
+            );
+            
+            // ✅ 2. ลบ transaction (จะลบ payment record ด้วย)
+            if (expense) {
+                console.log(`🗑️ Deleting related transaction: ${expense.id}`);
+                if (isLoggedIn) {
+                    await deleteTransaction(expense.id, true);
+                } else {
+                    await financeDB.deleteTransaction(expense.id);
+                }
+            } else {
+                // ถ้าไม่พบ transaction ให้ลบ payment อย่างเดียว
+                if (isLoggedIn && navigator.onLine) {
+                    await deleteDebtPaymentFromBackend(paymentId);
+                }
+                
+                payments = payments.filter(p => p.id !== paymentId);
+                
+                if (saveToLocalEnabled) {
+                    savePaymentsToStorage();
                 }
             }
             
-            payments = payments.filter(p => p.id !== paymentId);
-            savePaymentsToStorage();
-            renderDebtPage();
+            // ✅ 3. โหลดข้อมูลใหม่
+            if (isLoggedIn && navigator.onLine) {
+                await Promise.all([
+                    loadTransactionsFromBackend(),
+                    loadPaymentsFromBackend()
+                ]);
+                transactions = backendTransactions;
+            }
             
+            renderDebtPage();
             updateUI();
+            renderCalendar();
             refreshAnalysisCharts();
             
-            showToast('ลบรายการชำระสำเร็จ');
+            showToast('✅ ลบรายการชำระสำเร็จ');
             hideConfirm();
         }
     );
@@ -6871,6 +7647,9 @@ function deleteDebt(debtId) {
     const debtName = debt.name;
     const isClosedDebt = debt.status === 'closed';
     
+    // ✅ ตรวจสอบ saveToLocalEnabled
+    const shouldSaveToLocal = saveToLocalEnabled;
+    
     if (isClosedDebt) {
         showConfirm(
             'ลบรายการหนี้ที่ปิดแล้ว?',
@@ -6879,10 +7658,11 @@ function deleteDebt(debtId) {
             () => {
                 debts = debts.filter(d => d.id !== debtId);
                 
-                saveDebtsToStorage();
+                if (shouldSaveToLocal) {
+                    saveDebtsToStorage();
+                }
                 
                 renderDebtPage();
-                
                 showToast(`🗑️ ลบรายการหนี้ "${debtName}" จากรายการที่ปิดแล้วสำเร็จ`);
                 hideConfirm();
             }
@@ -6892,36 +7672,44 @@ function deleteDebt(debtId) {
             'ลบรายการหนี้?', 
             'ลบแล้วจะกู้คืนไม่ได้ รวมถึงประวัติการชำระที่เกี่ยวข้อง', 
             async () => {
-                const debtToDelete = debts.find(d => d.id === debtId);
+                // ลบ MySQL
+                if (isLoggedIn && navigator.onLine) {
+                    await deleteDebtFromBackend(debtId);
+                } else if (isLoggedIn && !navigator.onLine && shouldSaveToLocal) {
+                    addToSyncQueue({ id: debtId }, 'delete_debt');
+                }
+                
                 debts = debts.filter(d => d.id !== debtId);
                 
                 const relatedPayments = payments.filter(p => p.debtId === debtId);
                 payments = payments.filter(p => p.debtId !== debtId);
                 
-                if (debtToDelete && relatedPayments.length > 0) {
+                // ลบ expense transactions ที่เกี่ยวข้อง
+                if (debt && relatedPayments.length > 0) {
                     try {
                         const relatedExpenses = transactions.filter(t => 
                             t.isDebtPayment && t.originalDebtId === debtId
                         );
                         
                         for (const expense of relatedExpenses) {
-                            await financeDB.deleteTransaction(expense.id);
+                            if (isLoggedIn) {
+                                await deleteTransaction(expense.id, true);
+                            } else {
+                                await financeDB.deleteTransaction(expense.id);
+                            }
                         }
-                        
-                        transactions = transactions.filter(t => 
-                            !(t.isDebtPayment && t.originalDebtId === debtId)
-                        );
-                        
-                        console.log(`✅ ลบ ${relatedExpenses.length} รายการ expense ที่เกี่ยวข้อง`);
                     } catch (error) {
                         console.error('❌ ไม่สามารถลบ expenses ที่เกี่ยวข้อง:', error);
                     }
                 }
                 
-                saveDebtsToStorage();
-                savePaymentsToStorage();
-                renderDebtPage();
+                // ✅ บันทึก local เฉพาะเมื่อ shouldSaveToLocal = true
+                if (shouldSaveToLocal) {
+                    saveDebtsToStorage();
+                    savePaymentsToStorage();
+                }
                 
+                renderDebtPage();
                 updateUI();
                 refreshAnalysisCharts();
                 
@@ -6945,21 +7733,64 @@ function closeDebt(debtId) {
         return;
     }
     
+    const shouldSaveToLocal = saveToLocalEnabled;
+    
     showConfirm(
         'ปิดหนี้?', 
-        `ยืนยันการปิดหนี้ "${debt.name}"\nชำระครบ ฿${paidAmount.toLocaleString()} แล้ว`,
-        () => {
+        `ยืนยันการปิดหนี้ "${debt.name}"\nชำระครบ ${paidAmount.toLocaleString()} บาท แล้ว`,
+        async () => {
+            // ตรวจสอบ: ถ้า offline และไม่ติ๊ก checkbox → ไม่สามารถปิดได้
+            if (isLoggedIn && !navigator.onLine && !shouldSaveToLocal) {
+                showToast('❌ ไม่สามารถปิดหนี้ได้ (ต้อง online เพื่อบันทึกที่ MySQL หรือติ๊ก "บันทึกลงเครื่อง")', 'error');
+                hideConfirm();
+                return;
+            }
+            
+            // อัปเดตข้อมูล debt
             debt.status = 'closed';
-            debt.closedAt = new Date().toISOString();
+            debt.closedAt = new Date().toISOString().split('T')[0];  // แปลงเป็น YYYY-MM-DD เท่านั้น
             debt.closingNote = `ชำระครบ ${paidAmount.toLocaleString()} บาท`;
             debt.updatedAt = new Date().toISOString();
             
-            saveDebtsToStorage();
+            console.log('📤 Closing debt with data:', {
+                id: debt.id,
+                name: debt.name,
+                status: debt.status,
+                closedAt: debt.closedAt,
+                totalAmount: debt.totalAmount,
+                paidAmount: paidAmount
+            });
             
+            // บันทึก MySQL (ถ้า online)
+            if (isLoggedIn && navigator.onLine) {
+                const success = await updateDebtInBackend(debt);
+                if (success) {
+                    console.log('✅ Debt closed in MySQL successfully');
+                } else {
+                    console.error('❌ Failed to close debt in MySQL');
+                    showToast('⚠️ ปิดหนี้ใน MySQL ไม่สำเร็จ แต่บันทึกในเครื่องแล้ว', 'warning');
+                }
+            } 
+            // ถ้า offline และติ๊ก checkbox → เก็บในคิว
+            else if (isLoggedIn && !navigator.onLine && shouldSaveToLocal) {
+                addToSyncQueue(debt, 'update_debt');
+                showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
+            }
+            
+            // บันทึก local เฉพาะเมื่อ shouldSaveToLocal = true
+            if (shouldSaveToLocal) {
+                saveDebtsToStorage();
+                console.log('💾 Debt saved to local storage');
+            } else {
+                console.log('⏭️ Skip saving debt to local (saveToLocalEnabled = false)');
+            }
+            
+            // รีเฟรช UI
             renderDebtPage();
+            updateUI();
+            refreshAnalysisCharts();
             
             showToast(`✅ ปิดหนี้ "${debt.name}" สำเร็จ`);
-            
             hideConfirm();
         }
     );
@@ -6969,32 +7800,59 @@ function reopenDebt(debtId) {
     const debt = debts.find(d => d.id === debtId);
     if (!debt) return;
     
+    const shouldSaveToLocal = saveToLocalEnabled;
+    
     showConfirm(
         'เปิดหนี้ใหม่?', 
         `ยืนยันการเปิดหนี้ "${debt.name}" ใหม่\nสามารถติดตามการชำระต่อได้`,
-        () => {
+        async () => {
             debt.status = 'open';
             debt.closedAt = null;
             debt.closingNote = '';
             debt.updatedAt = new Date().toISOString();
             
-            saveDebtsToStorage();
+            // บันทึก MySQL
+            if (isLoggedIn && navigator.onLine) {
+                await updateDebtInBackend(debt);
+            } else if (isLoggedIn && !navigator.onLine && shouldSaveToLocal) {
+                addToSyncQueue(debt, 'update_debt');
+            }
+            
+            // ✅ บันทึก local เฉพาะเมื่อ shouldSaveToLocal = true
+            if (shouldSaveToLocal) {
+                saveDebtsToStorage();
+            }
             
             renderDebtPage();
-            
             showToast(`📝 เปิดหนี้ "${debt.name}" ใหม่สำเร็จ`);
-            
             hideConfirm();
         }
     );
 }
 
 function saveDebtsToStorage() {
-    localStorage.setItem('fin_debts', JSON.stringify(debts));
+    console.log('💾 saveDebtsToStorage called, saveToLocalEnabled =', saveToLocalEnabled);
+    console.trace();
+    if (saveToLocalEnabled) {
+        localStorage.setItem('fin_debts', JSON.stringify(debts));
+    } else {
+        console.warn('⚠️ ข้ามการบันทึก localStorage เพราะ saveToLocalEnabled = false');
+    }
 }
 
 function savePaymentsToStorage() {
-    localStorage.setItem('fin_debt_payments', JSON.stringify(payments));
+    // ✅ เพิ่มการตรวจสอบ
+    if (!saveToLocalEnabled) {
+        console.log('⏭️ savePaymentsToStorage: Skipped (saveToLocalEnabled = false)');
+        return;
+    }
+    
+    try {
+        localStorage.setItem('fin_debt_payments', JSON.stringify(payments));
+        console.log('💾 Payments saved to localStorage');
+    } catch (error) {
+        console.error('Failed to save payments:', error);
+    }
 }
 
 function switchPieChartTab(tab) {
@@ -7418,34 +8276,100 @@ function getAccountBalance(accountId) {
     const account = accounts.find(a => a.id === accountId);
     if (!account) return 0;
     
-    let balanceFromTransactions = account.initialBalance || 0;
+    let baseBalance = account.initialBalance || 0;
+    
+    console.log(`💰 [DEBUG] คำนวณยอด ${account.name} (${accountId})`);
+    console.log(`   initialBalance: ${baseBalance}`);
     
     transactions.forEach(t => {
         if (t.accountId === accountId) {
-            if (t.type === 'income') {
-                balanceFromTransactions += t.amount;
-            } else if (t.type === 'expense') {
-                balanceFromTransactions -= t.amount;
-            } else if (t.type === 'transfer') {
-                balanceFromTransactions -= t.amount;
-            }
+            console.log(`   transaction: id=${t.id}, type=${t.type}, amount=${t.amount}, isInitialBalance=${t.isInitialBalance}, transferType=${t.transferType}`);
         }
         
-        if (t.type === 'transfer' && t.transferToAccountId === targetAccountId) {  
-            if (t.transferType !== 'as_income') {
-                balanceFromTransactions += t.amount;
+        // ข้าม transaction ที่เป็น initial balance
+        if (t.isInitialBalance && t.accountId === accountId) {
+            console.log(`   ⏭️ ข้าม initial balance transaction: ${t.id}`);
+            return;
+        }
+        
+        // รายรับ/รายจ่ายปกติ
+        if (t.accountId === accountId) {
+            if (t.type === 'income') {
+                baseBalance += t.amount;
+                console.log(`   +${t.amount} (income)`);
+            } else if (t.type === 'expense') {
+                baseBalance -= t.amount;
+                console.log(`   -${t.amount} (expense)`);
+            } else if (t.type === 'transfer') {
+                // Transfer ฝั่งต้นทาง (หักเงิน)
+                if (t.transferType !== 'internal_receive') {
+                    baseBalance -= t.amount;
+                    console.log(`   -${t.amount} (transfer out, type=${t.transferType})`);
+                }
+                // ✅ Transfer ฝั่งรับ (บวกเงิน) - internal_receive
+                else if (t.transferType === 'internal_receive') {
+                    baseBalance += t.amount;
+                    console.log(`   +${t.amount} (transfer in, type=${t.transferType})`);
+                }
             }
         }
     });
     
-    if (account.adjustedBalance !== undefined) {
-        const balanceAtAdjustment = account.balanceAtAdjustment || balanceFromTransactions;
-        const adjustmentDiff = account.adjustedBalance - balanceAtAdjustment;
-        
-        return balanceFromTransactions + adjustmentDiff;
+    if (account.manualAdjustment !== undefined) {
+        baseBalance += account.manualAdjustment;
+        console.log(`   + manual adjustment: ${account.manualAdjustment}`);
     }
     
-    return balanceFromTransactions;
+    console.log(`   = ${baseBalance}`);
+    return baseBalance;
+}
+
+function validateInitialBalanceTransaction(transactionData, isUpdate = false, oldTransaction = null) {
+    // ตรวจสอบว่าเป็น initial balance transaction หรือไม่
+    if (!transactionData.isInitialBalance) {
+        return { valid: true };
+    }
+    
+    // 1. ตรวจสอบ type ต้องเป็น 'income' เท่านั้น
+    if (transactionData.type !== 'income') {
+        return { 
+            valid: false, 
+            error: '⚠️ ไม่สามารถเปลี่ยนประเภทของรายการยอดเริ่มต้นบัญชีได้ (ต้องเป็นรายรับเท่านั้น)' 
+        };
+    }
+    
+    // 2. ตรวจสอบ category ต้องเป็น 'อื่นๆ' (หรือหมวดหมู่ที่กำหนด)
+    if (transactionData.category !== 'อื่นๆ') {
+        return { 
+            valid: false, 
+            error: '⚠️ ไม่สามารถเปลี่ยนหมวดหมู่ของรายการยอดเริ่มต้นบัญชีได้' 
+        };
+    }
+    
+    // 3. ตรวจสอบว่าเป็นกรณีเพิ่มใหม่ (ไม่ใช่แก้ไข) และมี initial balance อยู่แล้วหรือไม่
+    if (!isUpdate) {
+        const existingInitial = transactions.some(t => 
+            t.accountId === transactionData.accountId && 
+            t.isInitialBalance === true
+        );
+        
+        if (existingInitial) {
+            return { 
+                valid: false, 
+                error: '⚠️ บัญชีนี้มีรายการยอดเริ่มต้นอยู่แล้ว ไม่สามารถเพิ่มซ้ำได้' 
+            };
+        }
+    }
+    
+    // 4. กรณีแก้ไข: ตรวจสอบว่าไม่ได้เปลี่ยน accountId
+    if (isUpdate && oldTransaction && oldTransaction.accountId !== transactionData.accountId) {
+        return { 
+            valid: false, 
+            error: '⚠️ ไม่สามารถเปลี่ยนบัญชีของรายการยอดเริ่มต้นได้' 
+        };
+    }
+    
+    return { valid: true };
 }
 
 function updateAccountBalance(accountId) {
@@ -7467,6 +8391,9 @@ function calculateTotalBalance() {
 }
 
 function getAccountById(accountId) {
+    if (!accountId || accountId === 'all') return null;
+    
+
     return accounts.find(a => a.id === accountId);
 }
 
@@ -7474,9 +8401,10 @@ function getDefaultAccount() {
     return accounts.find(a => a.isDefault) || accounts[0];
 }
 
-function setDefaultAccount(accountId) {
+async function setDefaultAccount(accountId) {
     console.log('Setting default account:', accountId);
     
+    // อัปเดต local
     accounts.forEach(account => {
         account.isDefault = (account.id === accountId);
         account.updatedAt = new Date().toISOString();
@@ -7487,8 +8415,21 @@ function setDefaultAccount(accountId) {
     
     saveAccounts();
     
-    renderAccountsList();
+    // ✅ อัปเดต MySQL
+    if (isLoggedIn && navigator.onLine) {
+        for (const account of accounts) {
+            await updateAccountInBackend({
+                id: account.id,
+                name: account.name,
+                type: account.type,
+                icon: account.icon,
+                initialBalance: account.initialBalance,
+                isDefault: account.isDefault
+            });
+        }
+    }
     
+    renderAccountsList();
     refreshDesktopFormContainer();
     
     if (document.getElementById('transferFromAccount')) {
@@ -7591,14 +8532,16 @@ function confirmAdjustBalance() {
         return;
     }
     
+    // ✅ แก้ไข: ใช้ adjustingAccountId แทน targetAccountId
     let baseTransactionBalance = account.initialBalance || 0;
     transactions.forEach(t => {
-        if (t.accountId === targetAccountId) {  
+        // ✅ ใช้ adjustingAccountId แทน targetAccountId
+        if (t.accountId === adjustingAccountId) {
             if (t.type === 'income') baseTransactionBalance += t.amount;
             else if (t.type === 'expense') baseTransactionBalance -= t.amount;
             else if (t.type === 'transfer') baseTransactionBalance -= t.amount;
         }
-        if (t.type === 'transfer' && t.transferToAccountId === targetAccountId) {  
+        if (t.type === 'transfer' && t.transferToAccountId === adjustingAccountId) {
             if (t.transferType !== 'as_income') baseTransactionBalance += t.amount;
         }
     });
@@ -7639,29 +8582,7 @@ function confirmAdjustBalance() {
     }
 }
 
-function getAccountBalance(accountId) {
-    const account = accounts.find(a => a.id === accountId);
-    if (!account) return 0;
-    
-    let baseBalance = account.initialBalance || 0;
-    
-    transactions.forEach(t => {
-        if (t.accountId === accountId) {
-            if (t.type === 'income') baseBalance += t.amount;
-            else if (t.type === 'expense') baseBalance -= t.amount;
-            else if (t.type === 'transfer') baseBalance -= t.amount;
-        }
-        if (t.type === 'transfer' && t.transferToAccountId === accountId) {
-            if (t.transferType !== 'as_income') baseBalance += t.amount;
-        }
-    });
-    
-    if (account.manualAdjustment !== undefined) {
-        return baseBalance + account.manualAdjustment;
-    }
-    
-    return baseBalance;
-}
+
 
 function renderAccountsList() {
     const container = document.getElementById('accountsListContainer');
@@ -7885,7 +8806,7 @@ function selectAccountIcon(icon) {
     document.getElementById('selectedAccountIcon').textContent = icon;
 }
 
-function saveAccount() {
+async function saveAccount() {
     const name = document.getElementById('accountNameInput').value.trim();
     if (!name) {
         showToast('กรุณาระบุชื่อบัญชี');
@@ -7897,34 +8818,96 @@ function saveAccount() {
     const isDefault = document.getElementById('isDefaultAccount').checked;
     
     if (editingAccountId) {
+        // แก้ไขบัญชี
         const account = getAccountById(editingAccountId);
-        if (account) {
-            account.name = name;
-            account.type = type;
-            account.icon = selectedAccountIcon;
-            account.updatedAt = new Date().toISOString();
-
-            if (isLoggedIn && navigator.onLine) {
-                updateAccountInBackend(account);  
+        if (!account) {
+            showToast('ไม่พบข้อมูลบัญชี');
+            return;
+        }
+        
+        const oldInitialBalance = account.initialBalance || 0;
+        const isChangingInitialBalance = (initialBalance !== oldInitialBalance);
+        
+        if (isChangingInitialBalance) {
+            // ✅ ตรวจสอบว่ามี transaction ใดๆ ของบัญชีนี้หรือไม่ (รวม initial balance)
+            const hasAnyTransaction = transactions.some(t => 
+                t.accountId === editingAccountId
+            );
+            
+            if (hasAnyTransaction) {
+                showToast('⚠️ ไม่สามารถแก้ไขยอดเริ่มต้นผ่านหน้าแก้ไขบัญชีได้ เนื่องจากมีรายการในบัญชีนี้แล้ว (ให้แก้ไขผ่านหน้า history แทน)', 'error');
+                document.getElementById('accountInitialBalance').value = oldInitialBalance;
+                return;
             }
             
-            if (isDefault) {
-                setDefaultAccount(account.id);
-            } else if (account.isDefault && !isDefault) {
-                const otherAccount = accounts.find(a => a.id !== account.id);
-                if (otherAccount) {
-                    setDefaultAccount(otherAccount.id);
+            // ✅ ถ้าไม่มี transaction เลย (บัญชีใหม่ที่ยังไม่มีข้อมูล) ให้สร้าง transaction ใหม่
+            if (initialBalance > 0) {
+                const now = new Date();
+                const newTransaction = {
+                    id: `initial_${account.id}_${Date.now()}`,
+                    amount: initialBalance,
+                    type: 'income',
+                    category: 'อื่นๆ',
+                    icon: '💰',
+                    desc: `ยอดเริ่มต้นบัญชี ${name}`,
+                    tag: '#เปิดบัญชี',
+                    rawDate: now.toISOString().split('T')[0],
+                    monthKey: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
+                    date: now.toISOString().split('T')[0],
+                    accountId: account.id,
+                    isInitialBalance: true,
+                    createdAt: now.toISOString(),
+                    updatedAt: now.toISOString(),
+                    owner_type: isLoggedIn ? 'user' : 'guest',
+                    owner_id: isLoggedIn ? currentUser.id : getGuestId()
+                };
+                
+                // บันทึก transaction
+                if (isLoggedIn) {
+                    await saveLoggedInTransaction(newTransaction);
+                } else {
+                    await saveGuestTransaction(newTransaction);
                 }
             }
         }
+        
+        // อัปเดตข้อมูลบัญชี
+        account.name = name;
+        account.type = type;
+        account.icon = selectedAccountIcon;
+        account.initialBalance = initialBalance;
+        account.updatedAt = new Date().toISOString();
+
+        if (isLoggedIn && navigator.onLine) {
+            await updateAccountInBackend(account);
+        }
+        
+        if (isDefault) {
+            setDefaultAccount(account.id);
+        } else if (account.isDefault && !isDefault) {
+            const otherAccount = accounts.find(a => a.id !== account.id);
+            if (otherAccount) {
+                setDefaultAccount(otherAccount.id);
+            }
+        }
+        
+        saveAccounts();
+        renderAccountsList();
+        closeAccountModal();
+        updateAccountSelect();
+        updateAccountFilterDropdown();
+        
+        showToast('อัปเดตบัญชีสำเร็จ');
+        
     } else {
+        // เพิ่มบัญชีใหม่
         const newAccount = {
             id: 'acc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
             name,
             type,
             icon: selectedAccountIcon,
             color: getRandomAccountColor(),
-            initialBalance,
+            initialBalance: initialBalance,
             isDefault: false,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
@@ -7932,17 +8915,19 @@ function saveAccount() {
         
         accounts.push(newAccount);
 
+        // บันทึกบัญชีไป MySQL (ถ้า login และออนไลน์)
         if (isLoggedIn && navigator.onLine) {
-            saveAccountToBackend(newAccount);
+            await saveAccountToBackend(newAccount);
         }
         
+        // บันทึก initial transaction (ถ้ามียอดเริ่มต้น)
         if (initialBalance > 0) {
             const now = new Date();
             const initialTransaction = {
                 id: `initial_${newAccount.id}`,
                 amount: initialBalance,
                 type: 'income',
-                category: 'ยอดเริ่มต้นบัญชี',
+                category: 'อื่นๆ',
                 icon: '💰',
                 desc: `ยอดเริ่มต้นบัญชี ${name}`,
                 tag: '#เปิดบัญชี',
@@ -7952,34 +8937,40 @@ function saveAccount() {
                 accountId: newAccount.id,
                 isInitialBalance: true,
                 createdAt: now.toISOString(),
-                updatedAt: now.toISOString()
+                updatedAt: now.toISOString(),
+                owner_type: isLoggedIn ? 'user' : 'guest',
+                owner_id: isLoggedIn ? currentUser.id : getGuestId()
             };
             
-            financeDB.saveTransaction(initialTransaction);
-            transactions.unshift(initialTransaction);
+            if (isLoggedIn) {
+                await saveLoggedInTransaction(initialTransaction);
+            } else {
+                await saveGuestTransaction(initialTransaction);
+            }
         }
         
+        // ตั้งค่าเป็นบัญชีหลัก
         if (isDefault) {
             setDefaultAccount(newAccount.id);
         } else if (accounts.length === 1) {
             setDefaultAccount(newAccount.id);
         }
+        
+        saveAccounts();
+        renderAccountsList();
+        closeAccountModal();
+        updateAccountSelect();
+        updateAccountFilterDropdown();
+        
+        showToast('✅ เพิ่มบัญชีสำเร็จ');
     }
-    
-    saveAccounts();
-    renderAccountsList();
-    closeAccountModal();
-    updateAccountSelect();
-    updateAccountFilterDropdown();
-    
-    showToast(editingAccountId ? 'อัปเดตบัญชีสำเร็จ' : '✅ เพิ่มบัญชีสำเร็จ');
 }
 
 async function updateAccountInBackend(accountData) {
     if (!isLoggedIn || !navigator.onLine) return false;
     
     try {
-        const response = await fetch(`${API_URL}/accounts/${accountData.id}`, {
+         const response = await fetch(`${API_URL}/accounts/${accountData.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -7987,11 +8978,18 @@ async function updateAccountInBackend(accountData) {
                 name: accountData.name,
                 type: accountData.type,
                 icon: accountData.icon,
+                initialBalance: accountData.initialBalance || 0,
                 isDefault: accountData.isDefault || false
             })
         });
         
-        return response.ok;
+        if (!response.ok) {
+            throw new Error('อัปเดตไม่สำเร็จ');
+        }
+        
+        console.log('✅ อัปเดต account ใน MySQL สำเร็จ');
+        return true;
+        
     } catch (error) {
         console.error('Error updating account:', error);
         return false;
@@ -8003,38 +9001,143 @@ function editAccount(accountId) {
 }
 
 function deleteAccount(accountId) {
+    console.log('🗑️ deleteAccount called with id:', accountId);
+    
     const account = getAccountById(accountId);
-    if (!account) return;
+    if (!account) {
+        console.log('❌ Account not found');
+        return;
+    }
     
     if (account.isDefault) {
         showToast('ไม่สามารถลบบัญชีหลักได้');
         return;
     }
     
+    // ✅ นับจำนวน transaction ที่เกี่ยวข้อง
     const hasTransactions = transactions.some(t => 
         t.accountId === accountId || t.transferToAccountId === accountId
     );
     
+    // ✅ นับจำนวน transaction ที่แน่นอน
+    const transactionCount = transactions.filter(t => 
+        t.accountId === accountId || t.transferToAccountId === accountId
+    ).length;
+    
     if (hasTransactions) {
+        // ✅ แจ้งเตือนว่ามี transaction กี่รายการที่จะถูกลบ
         showConfirm(
-            'ลบบัญชี?', 
-            `บัญชี "${account.name}" มีรายการ ${hasTransactions} รายการ ลบแล้วจะกู้คืนไม่ได้`, 
-            () => {
-                performDeleteAccount(accountId);
+            '⚠️ ลบบัญชีและรายการทั้งหมด?', 
+            `บัญชี "${account.name}" มีรายการที่เกี่ยวข้อง ${transactionCount} รายการ\n\n` +
+            `⚠️ คำเตือน: Transaction ทั้งหมด ${transactionCount} รายการจะถูกลบถาวร\n` +
+            `📌 รวมถึงรายการรับ-จ่าย และรายการโอนเงินที่เกี่ยวข้อง\n\n` +
+            `❌ ไม่สามารถกู้คืนได้!`, 
+            async () => {
+                await performDeleteAccount(accountId);
             }
         );
     } else {
+        // ✅ ถ้าไม่มี transaction ก็ลบเฉยๆ
         performDeleteAccount(accountId);
     }
 }
 
-function performDeleteAccount(accountId) {
-    accounts = accounts.filter(a => a.id !== accountId);
-    saveAccounts();
-    renderAccountsList();
-    updateAccountSelect();
-    showToast('ลบบัญชีสำเร็จ');
+// ✅ สร้างฟังก์ชันใหม่สำหรับการลบ (แยก logic)
+async function performDeleteAccount(accountId) {
+    try {
+        const account = getAccountById(accountId);
+        const accountName = account ? account.name : accountId;
+        
+        console.log('🗑️ กำลังลบบัญชีและรายการทั้งหมด:', accountId, accountName);
+        
+        // ✅ นับ transaction ก่อนลบ (สำหรับแสดงผล)
+        const transactionCount = transactions.filter(t => 
+            t.accountId === accountId || t.transferToAccountId === accountId
+        ).length;
+        
+        // 1. ลบจาก MySQL (พร้อม transactions ที่เกี่ยวข้อง)
+        if (isLoggedIn && navigator.onLine) {
+            console.log('📡 Sending DELETE to MySQL...');
+            const response = await fetch(`${API_URL}/accounts/${accountId}?user_id=${currentUser.id}`, {
+                method: 'DELETE'
+            });
+            
+            const result = await response.json();
+            console.log('📡 Response:', result);
+            
+            if (!response.ok) {
+                throw new Error(result.error || 'ลบจาก MySQL ไม่สำเร็จ');
+            }
+            
+            console.log(`✅ ลบจาก MySQL สำเร็จ: ลบ account และ ${result.deleted_transactions || transactionCount} transactions`);
+        } else if (isLoggedIn && !navigator.onLine) {
+            // ถ้า offline ให้ใส่คิวรอซิงค์
+            addToSyncQueue({ id: accountId, type: 'delete_account' }, 'delete_account');
+            showToast('📦 ออฟไลน์: จะลบเมื่อกลับมาออนไลน์', 'info');
+        }
+        
+        // 2. ลบจาก local (accounts array)
+        accounts = accounts.filter(a => a.id !== accountId);
+        saveAccounts();
+        
+        // 3. ลบ transactions ที่เกี่ยวข้องจาก local
+        const beforeTxCount = transactions.length;
+        transactions = transactions.filter(t => 
+            t.accountId !== accountId && t.transferToAccountId !== accountId
+        );
+        const deletedTxCount = beforeTxCount - transactions.length;
+        console.log(`✅ ลบ transactions ในเครื่อง ${deletedTxCount} รายการ`);
+        
+        // 4. ลบจาก IndexedDB
+        if (financeDB && financeDB.db) {
+            try {
+                // ลบ account จาก IndexedDB
+                const transaction = financeDB.db.transaction(['accounts'], 'readwrite');
+                const store = transaction.objectStore('accounts');
+                await new Promise((resolve, reject) => {
+                    const request = store.delete('user_accounts');
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                });
+                
+                // ลบ transactions ที่เกี่ยวข้องจาก IndexedDB
+                const allTx = await financeDB.getAllTransactions();
+                for (const tx of allTx) {
+                    if (tx.accountId === accountId || tx.transferToAccountId === accountId) {
+                        await financeDB.deleteTransaction(tx.id);
+                    }
+                }
+                
+                console.log('✅ ลบจาก IndexedDB สำเร็จ');
+            } catch (dbError) {
+                console.warn('⚠️ ลบ IndexedDB ไม่สำเร็จ:', dbError);
+            }
+        }
+        
+        // 5. อัปเดต UI
+        renderAccountsList();
+        updateAccountSelect();
+        updateAccountFilterDropdown();
+        updateUI();
+        renderCalendar();
+        refreshAnalysisCharts();
+        
+        // 6. เปลี่ยน currentAccountId ถ้าจำเป็น
+        if (currentAccountId === accountId && accounts.length > 0) {
+            const newDefault = accounts.find(a => a.isDefault) || accounts[0];
+            if (newDefault) {
+                setDefaultAccount(newDefault.id);
+            }
+        }
+        
+        showToast(`✅ ลบบัญชี "${accountName}" และ ${deletedTxCount} รายการที่เกี่ยวข้อง สำเร็จ`);
+        
+    } catch (error) {
+        console.error('❌ Error deleting account:', error);
+        showToast(`❌ ${error.message}`);
+    }
 }
+
 
 function getRandomAccountColor() {
     const colors = [
@@ -8046,8 +9149,6 @@ function getRandomAccountColor() {
 
 
 function updateAccountSelect() {
-    console.log("🔄 updateAccountSelect() ถูกเรียก");
-    
     const desktopSelect = document.getElementById('accountSelect');
     if (desktopSelect) {
         desktopSelect.innerHTML = accounts.map(acc => `
@@ -8056,21 +9157,9 @@ function updateAccountSelect() {
             </option>
         `).join('');
         
+        // ✅ ไม่ต้องแปลงเป็น parseInt
         if (!desktopSelect.value || !accounts.some(a => a.id === desktopSelect.value)) {
             desktopSelect.value = currentAccountId;
-        }
-    }
-    
-    const mobileSelect = document.getElementById('mobileAccountSelect');
-    if (mobileSelect) {
-        mobileSelect.innerHTML = accounts.map(acc => `
-            <option value="${acc.id}" ${acc.id === currentAccountId ? 'selected' : ''}>
-                ${acc.icon} ${acc.name}
-            </option>
-        `).join('');
-        
-        if (!mobileSelect.value || !accounts.some(a => a.id === mobileSelect.value)) {
-            mobileSelect.value = currentAccountId;
         }
     }
 }
@@ -8098,9 +9187,9 @@ function updateAccountFilterDropdown() {
     dropdownIds.forEach(id => {
         const select = document.getElementById(id);
         if (select) {
-            const currentValue = accountFilterId || 'all';
+            const currentValue = accountFilterId === 'all' ? 'all' : accountFilterId;
             select.innerHTML = optionsHTML;
-            select.value = currentValue; 
+            select.value = currentValue;
             
             select.removeEventListener('change', applyAccountFilter);
             select.addEventListener('change', applyAccountFilter);
@@ -8291,59 +9380,103 @@ function setBudgetMode(mode) {
 async function saveTransactionToBackend(transactionData) {
     if (!isLoggedIn || !navigator.onLine) {
         addToSyncQueue(transactionData, 'create');
-        return false;
+        return {
+            success: false,
+            offline: true,
+            message: 'Offline, added to sync queue'
+        };
     }
     
     try {
-        let accountIdForBackend = null;
-        if (transactionData.accountId && !isNaN(parseInt(transactionData.accountId))) {
-            accountIdForBackend = parseInt(transactionData.accountId);
+        let accountId = transactionData.accountId;
+        
+        if (!accountId || accountId === '' || accountId === 'null' || accountId === 'undefined') {
+            const defaultAccount = accounts.find(a => a.isDefault);
+            accountId = defaultAccount ? defaultAccount.id : 'default_acc';
         }
         
-        console.log('📤 ส่งข้อมูลไป backend:', {
-            ...transactionData,
-            accountId: accountIdForBackend
-        });
+        accountId = String(accountId);
+        
+        const validTypes = ['income', 'expense', 'transfer'];
+        const txType = transactionData.type;
+        
+        if (!txType || !validTypes.includes(txType)) {
+            console.error('❌ Invalid transaction type:', txType);
+            return {
+                success: false,
+                error: `Invalid transaction type: ${txType}`
+            };
+        }
+        
+        const payload = {
+            user_id: currentUser.id,
+            type: txType,
+            amount: transactionData.amount,
+            desc: transactionData.desc,
+            category: transactionData.category,
+            tag: transactionData.tag || '',
+            icon: transactionData.icon,
+            rawDate: transactionData.rawDate,
+            month_key: transactionData.monthKey,
+            accountId: accountId,
+            transferToAccountId: transactionData.transferToAccountId || null,
+            transferFromAccountId: transactionData.transferFromAccountId || null,
+            transferType: transactionData.transferType || null,
+            isDebtPayment: transactionData.isDebtPayment || false,
+            originalDebtId: transactionData.originalDebtId || null,
+            originalPaymentId: transactionData.originalPaymentId || null,
+            isInitialBalance: transactionData.isInitialBalance || false
+        };
+        
+        console.log('📤 saveTransactionToBackend payload:', payload);
         
         const response = await fetch(`${API_URL}/transactions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                user_id: currentUser.id,
-                type: transactionData.type,
-                amount: transactionData.amount,
-                desc: transactionData.desc,
-                category: transactionData.category,
-                tag: transactionData.tag || '',
-                icon: transactionData.icon,
-                rawDate: transactionData.rawDate,
-                month_key: transactionData.monthKey,
-                accountId: accountIdForBackend,  
-                transferToAccountId: transactionData.transferToAccountId || null
-            })
+            body: JSON.stringify(payload)
         });
         
         const result = await response.json();
         
         if (response.ok) {
-            console.log('✅ บันทึกที่ backend สำเร็จ:', result);
+            console.log('✅ บันทึกที่ backend สำเร็จ, id:', result.id);
+            console.log('✅ original_payment_id in response:', result.original_payment_id);
             
-            if (result.id && transactionData.id.startsWith('tx_')) {
-                transactionData.id = result.id.toString();
-                transactionData.backendId = result.id;
-                await financeDB.saveTransaction(transactionData);
-            }
-            
-            return true;
+            // ✅ return ค่าครบถ้วน
+            return {
+                success: true,
+                id: result.id.toString(),  // แปลงเป็น string
+                message: result.message,
+                original_payment_id: result.original_payment_id  // สำคัญ!
+            };
         } else {
-            throw new Error(result.error || 'Unknown error');
+            console.error('❌ Backend error:', result);
+            return {
+                success: false,
+                error: result.error || 'Unknown error'
+            };
         }
         
     } catch (error) {
         console.error('❌ บันทึก backend ไม่สำเร็จ:', error);
         addToSyncQueue(transactionData, 'create');
-        return false;
+        return {
+            success: false,
+            error: error.message
+        };
     }
+}
+
+function getCurrentTransactions() {
+    // ถ้า login และมีข้อมูลจาก backend ให้ใช้ backendTransactions
+    if (isLoggedIn && backendTransactions && backendTransactions.length > 0) {
+        console.log(`📊 ใช้ข้อมูลจาก backend: ${backendTransactions.length} รายการ`);
+        return backendTransactions;
+    }
+    
+    // ถ้าไม่มีให้ใช้ local transactions
+    console.log(`📊 ใช้ข้อมูลจาก local: ${transactions.length} รายการ`);
+    return transactions;
 }
 
 async function saveLoggedInTransaction(transactionData) {
@@ -8353,69 +9486,149 @@ async function saveLoggedInTransaction(transactionData) {
             saveToLocalEnabled = checkbox.checked;
         }
         
-        console.log('💾 saveLoggedInTransaction - saveToLocalEnabled =', saveToLocalEnabled);
+        // ตรวจสอบ accountId
+        if (!transactionData.accountId || transactionData.accountId === '') {
+            const defaultAccount = accounts.find(a => a.isDefault);
+            transactionData.accountId = defaultAccount ? defaultAccount.id : 'default_acc';
+        }
+        transactionData.accountId = String(transactionData.accountId);
+        
+        const isUpdate = !!editingTxId;
+        
+        // ดึง transaction เดิม (กรณีแก้ไข)
+        let oldTransaction = null;
+        if (isUpdate) {
+            oldTransaction = findTransactionById(editingTxId);
+        }
+        
+        // ตรวจสอบความถูกต้องของ initial balance transaction
+        const validation = validateInitialBalanceTransaction(transactionData, isUpdate, oldTransaction);
+        if (!validation.valid) {
+            showToast(validation.error, 'error');
+            return;
+        }
         
         if (window.financeDB) {
             window.financeDB.setSaveToLocalEnabled(saveToLocalEnabled);
         }
         
-        let backendId = null;
         let backendSuccess = false;
+        let backendId = transactionData.id;
         
+        const backendData = {
+            ...transactionData,
+            accountId: transactionData.accountId
+        };
+        
+        console.log('📤 ส่งข้อมูลไป backend:', {
+            ...backendData,
+            accountId: backendData.accountId
+        });
+        
+        // ✅ บันทึก MySQL ก่อน
         if (navigator.onLine) {
-            const result = await saveTransactionToBackend(transactionData);
-            if (result && result.id) {
-                backendId = result.id;
-                backendSuccess = true;
-                console.log('✅ บันทึก MySQL สำเร็จ, ID:', backendId);
+            let result;
+            if (isUpdate) {
+                result = await updateTransactionInBackend(backendData);
+                if (result && result.success) {
+                    backendId = result.id;
+                    backendSuccess = true;
+                }
+            } else {
+                result = await saveTransactionToBackend(backendData);
+                if (result && result.id) {
+                    backendId = result.id;
+                    transactionData.id = backendId.toString();
+                    transactionData.backendId = backendId;
+                    backendSuccess = true;
+                }
             }
         } else {
             if (!saveToLocalEnabled) {
                 showToast('❌ ไม่สามารถบันทึกได้ (ต้อง online เพื่อบันทึกที่ MySQL)', 'error');
                 return;
             }
-            addToSyncQueue(transactionData, editingTxId ? 'update' : 'create');
+            addToSyncQueue(transactionData, isUpdate ? 'update' : 'create');
             showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
         }
         
-        if (saveToLocalEnabled) {
-    console.log('💾 บันทึกลงเครื่อง (Local + IndexedDB)');
-    
-    if (backendId) {
-        transactionData.id = backendId.toString();
-        transactionData.backendId = backendId;
-        transactionData.isFromBackend = true;
-    }
-    
-    const result = await financeDB.saveTransaction(transactionData);
-    
-    if (result.success) {
-        updateTransactionsArray(transactionData);
-        console.log('✅ บันทึกในเครื่องสำเร็จ');
-    }
-} else {
-    console.log('☁️ บันทึกเฉพาะ MySQL (ข้ามการบันทึกในเครื่อง)');
-    
-    if (editingTxId) {
-        console.log('🗑️ ลบ temporary transaction:', editingTxId);
-        await financeDB.deleteTransaction(editingTxId);
-        
-        transactions = transactions.filter(t => t.id !== editingTxId);
-        
-        if (window.financeDB) {
-            window.financeDB.removeFromLocalStorageCache(editingTxId);
+        // ✅ ถ้าเป็น transaction initial balance ให้ sync กับ account.initialBalance
+        if (transactionData.isInitialBalance) {
+            const account = accounts.find(a => a.id === transactionData.accountId);
+            if (account) {
+                if (isUpdate) {
+                    const oldAmount = account.initialBalance;
+                    account.initialBalance = transactionData.amount;
+                    console.log(`✅ อัปเดต account.initialBalance จาก ${oldAmount} เป็น ${account.initialBalance} for account ${account.name}`);
+                    
+                    if (isLoggedIn && navigator.onLine) {
+                        await updateAccountInitialBalanceInBackend(account.id, account.initialBalance);
+                    }
+                } else {
+                    const existingInitial = transactions.some(t => 
+                        t.accountId === transactionData.accountId && 
+                        t.isInitialBalance && 
+                        t.id !== transactionData.id
+                    );
+                    if (!existingInitial) {
+                        account.initialBalance = transactionData.amount;
+                        console.log(`✅ ตั้งค่า account.initialBalance = ${account.initialBalance} for account ${account.name}`);
+                        
+                        if (isLoggedIn && navigator.onLine) {
+                            await updateAccountInitialBalanceInBackend(account.id, account.initialBalance);
+                        }
+                    } else {
+                        showToast('⚠️ บัญชีนี้มีรายการยอดเริ่มต้นอยู่แล้ว', 'error');
+                        return;
+                    }
+                }
+                saveAccounts();
+            }
         }
-    }
+        
+        console.log('🔍 Before handleDebtPayment:', {
+    isDebtPayment: transactionData.isDebtPayment,
+    editingTxId: editingTxId,
+    editingDebtPaymentId: window.editingDebtPaymentId
+});
+
+if (transactionData.isDebtPayment) {
+    console.log('📞 Calling handleDebtPayment...');
+    await handleDebtPayment(transactionData);
+} else {
+    console.log('⏭️ Skip handleDebtPayment (isDebtPayment = false)');
 }
+
+        // บันทึกในเครื่องตาม checkbox
+        if (saveToLocalEnabled) {
+            console.log('💾 Saving to local storage...');
+            const result = await financeDB.saveTransaction(transactionData);
+            if (result.success) {
+                updateTransactionsArray(transactionData);
+            }
+        } else {
+            console.log('☁️ Skip saving to local (saveToLocalEnabled = false)');
+            // ถ้าไม่บันทึก local แต่ต้องการให้ transactions array มีข้อมูลปัจจุบัน
+            if (editingTxId) {
+                const index = transactions.findIndex(t => t.id === editingTxId);
+                if (index !== -1) {
+                    transactions[index] = transactionData;
+                }
+            } else {
+                if (!transactions.some(t => t.id === transactionData.id)) {
+                    transactions.unshift(transactionData);
+                }
+            }
+        }
         
         if (isLoggedIn && navigator.onLine) {
-            console.log('🔄 โหลดข้อมูลจาก backend ใหม่...');
             await loadTransactionsFromBackend();
             isShowingBackendData = true;
         }
         
         resetForm();
         updateUI();
+        renderAccountsList();
         
         if (!document.getElementById('overview-calendar-content').classList.contains('hidden')) {
             renderCalendar();
@@ -8432,6 +9645,87 @@ async function saveLoggedInTransaction(transactionData) {
     }
 }
 
+// ✅ เพิ่มฟังก์ชันใหม่สำหรับอัปเดต initialBalance ใน MySQL
+async function updateAccountInitialBalanceInBackend(accountId, newInitialBalance) {
+    if (!isLoggedIn || !navigator.onLine) return false;
+    
+    try {
+        const account = accounts.find(a => a.id === accountId);
+        if (!account) return false;
+        
+        const response = await fetch(`${API_URL}/accounts/${accountId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: currentUser.id,
+                name: account.name,
+                type: account.type,
+                icon: account.icon,
+                initialBalance: newInitialBalance,
+                isDefault: account.isDefault || false
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('อัปเดต initialBalance ไม่สำเร็จ');
+        }
+        
+        console.log(`✅ อัปเดต initialBalance ใน MySQL: account ${accountId} = ${newInitialBalance}`);
+        return true;
+        
+    } catch (error) {
+        console.error('Error updating account initialBalance:', error);
+        return false;
+    }
+}
+
+function validateInitialBalanceTransaction(transactionData, isUpdate = false, oldTransaction = null) {
+    // ตรวจสอบว่าเป็น initial balance transaction หรือไม่
+    if (!transactionData.isInitialBalance) {
+        return { valid: true };
+    }
+    
+    // 1. ตรวจสอบ type ต้องเป็น 'income' เท่านั้น
+    if (transactionData.type !== 'income') {
+        return { 
+            valid: false, 
+            error: '⚠️ ไม่สามารถเปลี่ยนประเภทของรายการยอดเริ่มต้นบัญชีได้ (ต้องเป็นรายรับเท่านั้น)' 
+        };
+    }
+    
+    // 2. ตรวจสอบ category ต้องเป็น 'อื่นๆ'
+    if (transactionData.category !== 'อื่นๆ') {
+        return { 
+            valid: false, 
+            error: '⚠️ ไม่สามารถเปลี่ยนหมวดหมู่ของรายการยอดเริ่มต้นบัญชีได้' 
+        };
+    }
+    
+    // 3. กรณีเพิ่มใหม่: ตรวจสอบว่ามี initial balance อยู่แล้วหรือไม่
+    if (!isUpdate) {
+        const existingInitial = transactions.some(t => 
+            t.accountId === transactionData.accountId && 
+            t.isInitialBalance === true
+        );
+        
+        if (existingInitial) {
+            return { 
+                valid: false, 
+                error: '⚠️ บัญชีนี้มีรายการยอดเริ่มต้นอยู่แล้ว ไม่สามารถเพิ่มซ้ำได้' 
+            };
+        }
+    }
+    
+    // 4. กรณีแก้ไข: ตรวจสอบว่าไม่ได้เปลี่ยน accountId
+    if (isUpdate && oldTransaction && oldTransaction.accountId !== transactionData.accountId) {
+        return { 
+            valid: false, 
+            error: '⚠️ ไม่สามารถเปลี่ยนบัญชีของรายการยอดเริ่มต้นได้' 
+        };
+    }
+    
+    return { valid: true };
+}
 
 async function saveGuestTransaction(transactionData) {
        console.log('👤 Guest mode - transactionData:', transactionData);
@@ -8546,6 +9840,13 @@ async function updateTransactionInBackend(transactionData) {
     }
     
     try {
+        console.log('📤 Updating transaction:', {
+            id: transactionData.id,
+            isDebtPayment: transactionData.isDebtPayment,
+            originalPaymentId: transactionData.originalPaymentId,
+            originalDebtId: transactionData.originalDebtId
+        });
+        
         const response = await fetch(`${API_URL}/transactions/${transactionData.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -8559,51 +9860,73 @@ async function updateTransactionInBackend(transactionData) {
                 icon: transactionData.icon,
                 date: transactionData.rawDate,
                 month_key: transactionData.monthKey,
-                account_id: transactionData.accountId
+                account_id: transactionData.accountId,
+                transfer_to_account_id: transactionData.transferToAccountId || null,
+                transfer_from_account_id: transactionData.transferFromAccountId || null,
+                transfer_type: transactionData.transferType || null,
+                is_debt_payment: transactionData.isDebtPayment || false,     // ✅ สำคัญ!
+                original_debt_id: transactionData.originalDebtId || null,    // ✅ สำคัญ!
+                original_payment_id: transactionData.originalPaymentId || null, // ✅ สำคัญ!
+                is_initial_balance: transactionData.isInitialBalance || false
             })
         });
         
         if (response.ok) {
+            const result = await response.json();
             console.log('✅ แก้ไขที่ backend สำเร็จ');
-            return true;
+            return { success: true, id: transactionData.id };
         } else {
             const result = await response.json();
+            console.error('Backend error:', result);
             throw new Error(result.error || 'Unknown error');
         }
         
     } catch (error) {
         console.error('❌ แก้ไข backend ไม่สำเร็จ:', error);
         addToSyncQueue(transactionData, 'update');
-        return false;
+        return { success: false, error: error.message };
     }
 }
 
 async function deleteTransactionFromBackend(transactionId) {
-    if (!isLoggedIn || !navigator.onLine) {
-        addToSyncQueue({ id: transactionId }, 'delete');
+    console.log('🗑️ deleteTransactionFromBackend START, id:', transactionId);
+    
+    if (!isLoggedIn) {
+        console.log('❌ Not logged in');
+        return false;
+    }
+    
+    if (!navigator.onLine) {
+        console.log('❌ Offline');
         return false;
     }
     
     if (transactionId.toString().startsWith('tx_')) {
+        console.log('⚠️ Skip: temporary ID');
         return true;
     }
     
     try {
-        const response = await fetch(`${API_URL}/transactions/${transactionId}?user_id=${currentUser.id}`, {
+        const url = `${API_URL}/transactions/${transactionId}?user_id=${currentUser.id}`;
+        console.log('📡 DELETE request to:', url);
+        
+        const response = await fetch(url, {
             method: 'DELETE'
         });
+        
+        console.log('📡 Response status:', response.status);
         
         if (response.ok) {
             console.log('✅ ลบที่ backend สำเร็จ');
             return true;
         } else {
             const result = await response.json();
-            throw new Error(result.error || 'Unknown error');
+            console.error('❌ ลบ backend ไม่สำเร็จ:', result);
+            return false;
         }
         
     } catch (error) {
-        console.error('❌ ลบ backend ไม่สำเร็จ:', error);
-        addToSyncQueue({ id: transactionId }, 'delete');
+        console.error('❌ Error deleting from backend:', error);
         return false;
     }
 }
@@ -8620,7 +9943,7 @@ async function saveAccountToBackend(accountData) {
                 name: accountData.name,
                 type: accountData.type,
                 icon: accountData.icon,
-                initialBalance: accountData.initialBalance || 0,
+                initialBalance: accountData.initialBalance || 0,  // ✅ ส่ง initialBalance
                 isDefault: accountData.isDefault || false
             })
         });
@@ -8630,8 +9953,8 @@ async function saveAccountToBackend(accountData) {
         if (response.ok && result.id) {
             console.log('✅ บันทึก account ที่ backend สำเร็จ');
             
-            accountData.id = result.id.toString();  
-            accountData.numericId = result.id;      
+            accountData.id = result.id.toString();
+            accountData.numericId = result.id;
             saveAccounts();
             
             return true;
@@ -8674,76 +9997,215 @@ async function saveBudgetsToBackend() {
 }
 
 
-function prepareTransactionData() {
-    const amt = parseFloat(document.getElementById('amount').value);
-    const catL = document.getElementById('category').value;
-    const cI = [...customCategories.income, ...customCategories.spending, ...customCategories.investment]
-        .find(c => c.label === catL);
-    const rD = document.getElementById('transDate').value;
-    const d = new Date(rD);
-    const newMonthKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    
-    let accountId = null;
-    const accountSelect = document.getElementById('accountSelect');
-    
-    if (accountSelect && accountSelect.value) {
-        accountId = accountSelect.value;
-    } else {
-        accountId = currentAccountId;
-    }
-    
-    if (!accountId) {
-        const defaultAccount = accounts.find(a => a.isDefault);
-        accountId = defaultAccount ? defaultAccount.id : 'default_acc';
-    }
-    
-    console.log('📝 prepareTransactionData - accountId:', accountId); 
-    
-    return {
-        id: editingTxId || `tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        amount: amt,
-        type: currentType,
-        category: catL,
-        icon: cI ? cI.icon : '❓',
-        desc: document.getElementById('desc').value.trim() || catL,
-        tag: document.getElementById('tagInput').value.trim(),
-        accountId: accountId,  
-        monthKey: newMonthKey,
-        rawDate: rD,
-        date: rD,
-        createdAt: editingTxId ? undefined : new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        
-        owner_type: isLoggedIn ? 'user' : 'guest',
-        owner_id: isLoggedIn ? currentUser.id : getGuestId()
-    };
-}
+
 
 async function handleDebtPayment(transactionData) {
-    if (!editingTxId || !window.editingDebtPaymentId) return;
+    console.log('🔵 ========== handleDebtPayment START ==========');
+    console.log('🔵 transactionData:', {
+        id: transactionData.id,
+        amount: transactionData.amount,
+        type: transactionData.type,
+        isDebtPayment: transactionData.isDebtPayment,
+        originalPaymentId: transactionData.originalPaymentId,
+        originalDebtId: transactionData.originalDebtId,
+        accountId: transactionData.accountId,
+        rawDate: transactionData.rawDate,
+        desc: transactionData.desc
+    });
+    console.log('🔵 Global variables:', {
+        editingTxId: editingTxId,
+        window_editingDebtPaymentId: window.editingDebtPaymentId,
+        isLoggedIn: isLoggedIn,
+        saveToLocalEnabled: saveToLocalEnabled,
+        navigator_onLine: navigator.onLine
+    });
     
-    const originalTransaction = transactions.find(t => t.id === editingTxId);
-    if (originalTransaction?.isDebtPayment) {
-        transactionData.isDebtPayment = true;
-        transactionData.originalPaymentId = originalTransaction.originalPaymentId;
-        transactionData.originalDebtId = originalTransaction.originalDebtId;
+    // ✅ กรณีแก้ไข debt payment (จากหน้า overview)
+    if (editingTxId && window.editingDebtPaymentId) {
+        console.log('✅ Case 1: Editing existing debt payment from overview');
+        console.log('   editingTxId:', editingTxId);
+        console.log('   window.editingDebtPaymentId:', window.editingDebtPaymentId);
         
-        const paymentIndex = payments.findIndex(p => p.id === window.editingDebtPaymentId);
-        if (paymentIndex !== -1) {
-            payments[paymentIndex] = {
-                ...payments[paymentIndex],
+        // ค้นหา transaction เดิม
+        const originalTransaction = transactions.find(t => t.id === editingTxId);
+        console.log('🔍 Original transaction found:', originalTransaction ? {
+            id: originalTransaction.id,
+            isDebtPayment: originalTransaction.isDebtPayment,
+            originalPaymentId: originalTransaction.originalPaymentId,
+            originalDebtId: originalTransaction.originalDebtId,
+            amount: originalTransaction.amount
+        } : 'NOT FOUND');
+        
+        if (originalTransaction?.isDebtPayment) {
+            console.log('✅ Original transaction is debt payment, proceeding...');
+            
+            // ตั้งค่าให้ transactionData
+            transactionData.isDebtPayment = true;
+            transactionData.originalPaymentId = originalTransaction.originalPaymentId;
+            transactionData.originalDebtId = originalTransaction.originalDebtId;
+            console.log('📝 Updated transactionData:', {
+                isDebtPayment: transactionData.isDebtPayment,
+                originalPaymentId: transactionData.originalPaymentId,
+                originalDebtId: transactionData.originalDebtId
+            });
+            
+            // ค้นหา payment record
+            const paymentIndex = payments.findIndex(p => p.id === window.editingDebtPaymentId);
+            console.log('🔍 Payment index in payments array:', paymentIndex);
+            console.log('🔍 Current payments array:', payments.map(p => ({ id: p.id, amount: p.amount, debtId: p.debtId })));
+            
+            if (paymentIndex !== -1) {
+                const oldPayment = payments[paymentIndex];
+                console.log('📦 Old payment data:', {
+                    id: oldPayment.id,
+                    amount: oldPayment.amount,
+                    date: oldPayment.date,
+                    accountId: oldPayment.accountId,
+                    note: oldPayment.note
+                });
+                
+                // สร้าง updated payment
+                const updatedPayment = {
+                    ...oldPayment,
+                    amount: transactionData.amount,
+                    date: transactionData.rawDate,
+                    note: transactionData.desc,
+                    updatedAt: new Date().toISOString()
+                };
+                console.log('🔄 Updated payment data:', {
+                    id: updatedPayment.id,
+                    oldAmount: oldPayment.amount,
+                    newAmount: updatedPayment.amount,
+                    oldDate: oldPayment.date,
+                    newDate: updatedPayment.date
+                });
+                
+                // อัปเดตใน memory
+                payments[paymentIndex] = updatedPayment;
+                console.log('✅ Updated payments array in memory');
+                
+                // ✅ บันทึก payment ไป MySQL
+                if (isLoggedIn && navigator.onLine) {
+                    console.log('🌐 Online - Updating payment in MySQL...');
+                    console.log('📤 Sending to updateDebtPaymentInBackend:', {
+                        id: updatedPayment.id,
+                        debtId: updatedPayment.debtId,
+                        accountId: updatedPayment.accountId,
+                        amount: updatedPayment.amount,
+                        date: updatedPayment.date,
+                        note: updatedPayment.note
+                    });
+                    
+                    const success = await updateDebtPaymentInBackend({
+                        id: updatedPayment.id,
+                        debtId: updatedPayment.debtId,
+                        accountId: updatedPayment.accountId,
+                        amount: updatedPayment.amount,
+                        date: updatedPayment.date,
+                        note: updatedPayment.note
+                    });
+                    
+                    console.log('📡 updateDebtPaymentInBackend result:', success);
+                    
+                    if (success) {
+                        console.log('✅ Payment updated in MySQL successfully');
+                    } else {
+                        console.error('❌ Failed to update payment in MySQL');
+                    }
+                } else if (isLoggedIn && !navigator.onLine && saveToLocalEnabled) {
+                    console.log('📱 Offline - Adding payment update to sync queue');
+                    addToSyncQueue(updatedPayment, 'update_payment');
+                    showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
+                } else {
+                    console.log('⚠️ Skip MySQL update - conditions not met:', {
+                        isLoggedIn: isLoggedIn,
+                        navigator_onLine: navigator.onLine,
+                        saveToLocalEnabled: saveToLocalEnabled
+                    });
+                }
+                
+                // บันทึก local เฉพาะเมื่อ saveToLocalEnabled = true
+                if (saveToLocalEnabled) {
+                    savePaymentsToStorage();
+                    console.log('💾 Saved payment to local storage');
+                } else {
+                    console.log('⏭️ Skip saving payment to local (saveToLocalEnabled = false)');
+                }
+            } else {
+                console.log('❌ Payment not found in payments array!');
+                console.log('   Searching for payment with id:', window.editingDebtPaymentId);
+                console.log('   Available payment ids:', payments.map(p => p.id));
+            }
+        } else {
+            console.log('⚠️ Original transaction is NOT a debt payment:', {
+                isDebtPayment: originalTransaction?.isDebtPayment,
+                id: originalTransaction?.id
+            });
+        }
+        
+        console.log('🔵 ========== handleDebtPayment END (Edit Case) ==========');
+        return;
+    }
+    
+    // ✅ กรณีสร้าง debt payment ใหม่ (จากหน้า debt)
+    if (!editingTxId && transactionData.isDebtPayment && transactionData.originalPaymentId) {
+        console.log('✅ Case 2: Creating new debt payment from debt page');
+        console.log('   originalPaymentId:', transactionData.originalPaymentId);
+        console.log('   originalDebtId:', transactionData.originalDebtId);
+        
+        // ตรวจสอบว่า payment มีอยู่แล้วหรือยัง
+        const existingPayment = payments.find(p => p.id === transactionData.originalPaymentId);
+        console.log('🔍 Existing payment found:', existingPayment ? 'YES' : 'NO');
+        
+        if (!existingPayment) {
+            const newPayment = {
+                id: transactionData.originalPaymentId,
+                debtId: transactionData.originalDebtId,
+                accountId: transactionData.accountId,
                 amount: transactionData.amount,
                 date: transactionData.rawDate,
                 note: transactionData.desc,
-                updatedAt: new Date().toISOString()
+                createdAt: new Date().toISOString()
             };
-            savePaymentsToStorage();
+            console.log('📦 New payment object:', newPayment);
             
-            if (!document.getElementById('page-debt').classList.contains('hidden')) {
-                renderDebtPage();
+            payments.push(newPayment);
+            console.log('✅ Added new payment to payments array');
+            console.log('   Current payments count:', payments.length);
+            
+            // บันทึก payment ไป MySQL
+            if (isLoggedIn && navigator.onLine) {
+                console.log('🌐 Online - Saving new payment to MySQL...');
+                await saveDebtPaymentToBackend(newPayment);
+                console.log('✅ New payment saved to MySQL');
+            } else if (isLoggedIn && !navigator.onLine && saveToLocalEnabled) {
+                console.log('📱 Offline - Adding new payment to sync queue');
+                addToSyncQueue(newPayment, 'create_payment');
+                showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
             }
+            
+            // บันทึก local เฉพาะเมื่อ saveToLocalEnabled = true
+            if (saveToLocalEnabled) {
+                savePaymentsToStorage();
+                console.log('💾 Saved new payment to local storage');
+            } else {
+                console.log('⏭️ Skip saving new payment to local (saveToLocalEnabled = false)');
+            }
+        } else {
+            console.log('⚠️ Payment already exists, skipping creation');
         }
+        
+        console.log('🔵 ========== handleDebtPayment END (Create Case) ==========');
+        return;
     }
+    
+    // ✅ กรณีอื่นๆ ที่ไม่เข้าเงื่อนไข
+    console.log('⚠️ Case 3: No matching condition');
+    console.log('   Conditions checked:');
+    console.log('   - editingTxId && window.editingDebtPaymentId:', !!(editingTxId && window.editingDebtPaymentId));
+    console.log('   - !editingTxId && transactionData.isDebtPayment && transactionData.originalPaymentId:', 
+        !!(!editingTxId && transactionData.isDebtPayment && transactionData.originalPaymentId));
+    console.log('🔵 ========== handleDebtPayment END (No Match) ==========');
 }
 
 async function handleMonthChange(transactionData) {
@@ -8863,29 +10325,7 @@ async function cleanupLocalTransactions() {
     }
 }
 
-async function loadUserDataFromBackend() {
-    if (!isLoggedIn || !navigator.onLine) return;
-    
-    showToast('🔄 กำลังโหลดข้อมูลจากเซิร์ฟเวอร์...', 'info');
-    
-    try {
-        await loadTransactionsFromBackend();
-        await loadAccountsFromBackend();
-        await loadCategoriesFromBackend();
-        await loadBudgetsFromBackend();
-        await loadDebtsFromBackend();
-        await loadTagsFromBackend();
-        
-        await cleanupLocalTransactions();
-        
-        showToast('✅ โหลดข้อมูลจากเซิร์ฟเวอร์สำเร็จ', 'success');
-        updateUI();
-        
-    } catch (error) {
-        console.error('Error loading user data:', error);
-        showToast('⚠️ โหลดข้อมูลบางส่วนไม่สำเร็จ', 'info');
-    }
-}
+
 
 
 function updateUIAfterSave() {
@@ -8933,7 +10373,6 @@ async function saveTransaction() {
     const transactionData = prepareTransactionData();
     
     await handleDebtPayment(transactionData);
-    
     await handleMonthChange(transactionData);
     
     if (isLoggedIn) {
@@ -8943,6 +10382,7 @@ async function saveTransaction() {
     }
 }
 
+// ใน prepareTransactionData() - ตรวจสอบและกำหนดค่า accountId ให้ถูกต้อง
 function prepareTransactionData() {
     const amt = parseFloat(document.getElementById('amount').value);
     const catL = document.getElementById('category').value;
@@ -8952,11 +10392,43 @@ function prepareTransactionData() {
     const d = new Date(rD);
     const newMonthKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     
-    let accountId = document.getElementById('accountSelect')?.value || currentAccountId;
-    let numericAccountId = null;
+    let accountId = document.getElementById('accountSelect')?.value;
+    if (!accountId || accountId === '') {
+        accountId = currentAccountId;
+    }
+    if (!accountId) {
+        const defaultAccount = accounts.find(a => a.isDefault);
+        accountId = defaultAccount ? defaultAccount.id : 'default_acc';
+    }
+    accountId = String(accountId);
+
+    let isInitialBalance = false;
+    let isDebtPayment = false;
+    let originalPaymentId = null;
+    let originalDebtId = null;
     
-    if (accountId && !accountId.startsWith('acc_') && !isNaN(parseInt(accountId))) {
-        numericAccountId = parseInt(accountId);
+    if (editingTxId) {
+        const oldTx = findTransactionById(editingTxId);
+        if (oldTx) {
+            if (oldTx.isInitialBalance) {
+                isInitialBalance = true;
+                if (oldTx.accountId !== accountId) {
+                    showToast('⚠️ ไม่สามารถเปลี่ยนบัญชีของรายการยอดเริ่มต้นได้', 'error');
+                    accountId = oldTx.accountId;
+                    document.getElementById('accountSelect').value = accountId;
+                }
+            }
+            
+            // ✅ สำคัญ: คงค่า isDebtPayment และ originalPaymentId ไว้
+            if (oldTx.isDebtPayment) {
+                isDebtPayment = true;
+                originalPaymentId = oldTx.originalPaymentId;
+                originalDebtId = oldTx.originalDebtId;
+                console.log('🔍 Editing debt payment - keeping isDebtPayment=true, originalPaymentId=', originalPaymentId);
+            } else {
+                console.log('🔍 Editing non-debt payment - isDebtPayment=', oldTx.isDebtPayment);
+            }
+        }
     }
     
     return {
@@ -8967,40 +10439,21 @@ function prepareTransactionData() {
         icon: cI ? cI.icon : '❓',
         desc: document.getElementById('desc').value.trim() || catL,
         tag: document.getElementById('tagInput').value.trim(),
-        accountId: numericAccountId,
+        accountId: accountId,
         monthKey: newMonthKey,
         rawDate: rD,
         date: rD,
+        isInitialBalance: isInitialBalance,
+        isDebtPayment: isDebtPayment,           // ✅ สำคัญ!
+        originalPaymentId: originalPaymentId,    // ✅ สำคัญ!
+        originalDebtId: originalDebtId,          // ✅ สำคัญ!
         createdAt: editingTxId ? undefined : new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        
         owner_type: isLoggedIn ? 'user' : 'guest',
         owner_id: isLoggedIn ? currentUser.id : getGuestId()
     };
 }
 
-async function handleDebtPayment(transactionData) {
-    if (!editingTxId || !window.editingDebtPaymentId) return;
-    
-    const originalTransaction = transactions.find(t => t.id === editingTxId);
-    if (originalTransaction?.isDebtPayment) {
-        transactionData.isDebtPayment = true;
-        transactionData.originalPaymentId = originalTransaction.originalPaymentId;
-        transactionData.originalDebtId = originalTransaction.originalDebtId;
-        
-        const paymentIndex = payments.findIndex(p => p.id === window.editingDebtPaymentId);
-        if (paymentIndex !== -1) {
-            payments[paymentIndex] = {
-                ...payments[paymentIndex],
-                amount: transactionData.amount,
-                date: transactionData.rawDate,
-                note: transactionData.desc,
-                updatedAt: new Date().toISOString()
-            };
-            savePaymentsToStorage();
-        }
-    }
-}
 
 async function handleMonthChange(transactionData) {
     if (!editingTxId) return;
@@ -9042,40 +10495,84 @@ function updateUIAfterSave() {
     refreshAnalysisCharts();
 }
 
-        function resetForm() { 
-            editingTxId = null;
-            window.editingDebtPaymentId = null;
-            document.getElementById('formTitle').innerText = "บันทึกรายการ"; document.getElementById('submitBtn').innerText = "บันทึก"; document.getElementById('cancelEditBtn').classList.add('hidden'); document.getElementById('amount').value = ''; document.getElementById('desc').value = ''; document.getElementById('tagInput').value = ''; setDefaultDate(); updateTagSuggestions(); }
+function resetForm() { 
+    editingTxId = null;
+    window.editingDebtPaymentId = null;
+    document.getElementById('formTitle').innerText = "บันทึกรายการ"; 
+    document.getElementById('submitBtn').innerText = "บันทึก"; 
+    document.getElementById('cancelEditBtn').classList.add('hidden'); 
+    document.getElementById('amount').value = ''; 
+    document.getElementById('desc').value = ''; 
+    document.getElementById('tagInput').value = ''; 
+    setDefaultDate(); 
+    updateTagSuggestions();
+    
+    // ✅ เพิ่ม: รีเซ็ตฟิลด์ที่ถูก disable
+    const categorySelect = document.getElementById('category');
+    const accountSelect = document.getElementById('accountSelect');
+    const btnIncome = document.getElementById('btn-income');
+    const btnExpense = document.getElementById('btn-expense');
+    
+    if (categorySelect) categorySelect.disabled = false;
+    if (accountSelect) accountSelect.disabled = false;
+    if (btnIncome) btnIncome.disabled = false;
+    if (btnExpense) btnExpense.disabled = false;
+    
+    // ✅ ลบ warning message
+    const warning = document.getElementById('initialBalanceWarning');
+    if (warning) warning.remove();
+}
         
 function editTransaction(id) { 
-    const t = transactions.find(tx => tx.id === id); 
-    if (!t) return;
+    const transaction = findTransactionById(id);
+    if (!transaction) return;
+
+    editingTxId = transaction.id;
     
-    console.log('🖥️ Desktop edit - Transaction:', t);
-    console.log('🖥️ desc value:', t.desc);
-    console.log('🖥️ category:', t.category);
-    console.log('🖥️ desc equals category?:', t.desc === t.category);
+    console.log('🖥️ Desktop edit - Transaction:', transaction);
+    console.log('🔍 isDebtPayment:', transaction.isDebtPayment);
+    console.log('🔍 originalPaymentId:', transaction.originalPaymentId);
 
     if (isMobile()) {
-        openMobileForm(t);
+        openMobileForm(transaction);
     } else {
         editingTxId = id; 
         document.getElementById('formTitle').innerText = "แก้ไข"; 
         document.getElementById('submitBtn').innerText = "อัปเดต"; 
         document.getElementById('cancelEditBtn').classList.remove('hidden'); 
         
-        setType(t.type); 
-        document.getElementById('amount').value = t.amount; 
-        document.getElementById('desc').value = t.desc === t.category ? "" : t.desc;
-        document.getElementById('tagInput').value = t.tag || ""; 
-        document.getElementById('transDate').value = t.rawDate; 
-        document.getElementById('category').value = t.category;
+        setType(transaction.type); 
+        document.getElementById('amount').value = transaction.amount; 
+        document.getElementById('desc').value = transaction.desc === transaction.category ? "" : transaction.desc;
+        document.getElementById('tagInput').value = transaction.tag || ""; 
+        document.getElementById('transDate').value = transaction.rawDate; 
+        document.getElementById('category').value = transaction.category;
         
-        if (t.isDebtPayment && t.originalPaymentId) {
-            console.log('🏦 กำลังแก้ไขรายการผ่อนหนี้, paymentId:', t.originalPaymentId);
-            window.editingDebtPaymentId = t.originalPaymentId;
+        if (document.getElementById('accountSelect')) {
+            document.getElementById('accountSelect').value = transaction.accountId;
+        }
+        
+        // ✅ สำหรับ debt payment: เก็บ originalPaymentId เสมอ (ไม่ว่า checkbox จะติ๊กหรือไม่)
+        if (transaction.isDebtPayment && transaction.originalPaymentId) {
+            console.log('🏦 Editing debt payment, paymentId:', transaction.originalPaymentId);
+            window.editingDebtPaymentId = transaction.originalPaymentId;
+            
+            // แสดงข้อความเตือน
+            if (!document.getElementById('debtPaymentWarning')) {
+                const warningMsg = document.createElement('div');
+                warningMsg.id = 'debtPaymentWarning';
+                warningMsg.className = 'text-blue-500 text-xs mt-2 p-2 bg-blue-50 rounded-lg';
+                warningMsg.innerHTML = '💰 รายการนี้เป็นรายการผ่อนหนี้ - การแก้ไขจะอัปเดตประวัติการชำระหนี้ด้วย';
+                const submitBtn = document.getElementById('submitBtn');
+                if (submitBtn && !document.getElementById('initialBalanceWarning')) {
+                    submitBtn.insertAdjacentHTML('beforebegin', warningMsg.outerHTML);
+                }
+            }
         } else {
+            console.log('⚠️ Not a debt payment or missing originalPaymentId');
             window.editingDebtPaymentId = null;
+            const warning = document.getElementById('debtPaymentWarning');
+            if (warning) warning.remove();
         }
         
         window.scrollTo({ top: 0, behavior: 'smooth' }); 
@@ -9086,83 +10583,143 @@ function editTransaction(id) {
     }
 }
         
-async function deleteTransaction(id) { 
-    showConfirm("ลบรายการ?", "ลบแล้วกู้คืนไม่ได้", async () => { 
-        try {
-            const transactionToDelete = transactions.find(t => t.id === id);
+async function deleteTransaction(id, skipConfirm = false) { 
+    console.log('🗑️ deleteTransaction START, id:', id);
+    
+    const transaction = findTransactionById(id);
+    if (!transaction) {
+        showToast("❌ ไม่พบรายการที่ต้องการลบ");
+        return;
+    }
+    
+    if (!skipConfirm) {
+        showConfirm("ลบรายการ?", "ลบแล้วกู้คืนไม่ได้", async () => { 
+            await performDelete(transaction, id);
+        });
+    } else {
+        await performDelete(transaction, id);
+    }
+}
+
+// แยก logic การลบออกมา
+async function performDelete(transaction, id) {
+    try {
+        const isDebtPayment = transaction.isDebtPayment;
+        const originalPaymentId = transaction.originalPaymentId;
+        const isInitialBalance = transaction.isInitialBalance;
+        const accountId = transaction.accountId;
+        
+        const saveToLocalCheckbox = document.getElementById('saveToLocalCheckbox');
+        const shouldSaveToLocal = saveToLocalCheckbox ? saveToLocalCheckbox.checked : true;
+        
+        console.log('🔍 [performDelete] checkbox.checked:', shouldSaveToLocal);
+        console.log('🔍 [performDelete] saveToLocalEnabled before:', saveToLocalEnabled);
+        console.log('🔍 [performDelete] isDebtPayment:', isDebtPayment);
+        console.log('🔍 [performDelete] originalPaymentId:', originalPaymentId);
+        
+        if (window.financeDB) {
+            window.financeDB.setSaveToLocalEnabled(shouldSaveToLocal);
+        }
+        
+        // ✅ 1. ลบ payment record ที่เกี่ยวข้อง (ถ้าเป็น debt payment)
+        if (isDebtPayment && originalPaymentId) {
+            console.log('🗑️ Found related payment, deleting payment id:', originalPaymentId);
             
-            let isDebtPayment = false;
-            let originalPaymentId = null;
-            
-            if (transactionToDelete && transactionToDelete.isDebtPayment) {
-                isDebtPayment = true;
-                originalPaymentId = transactionToDelete.originalPaymentId;
-                console.log('🔍 พบรายการผ่อนหนี้, paymentId:', originalPaymentId);
-            }
-             if (isLoggedIn && navigator.onLine && !id.toString().startsWith('tx_')) {
-                await deleteTransactionFromBackend(id);
+            // ลบจาก backend (MySQL)
+            if (isLoggedIn && navigator.onLine && !originalPaymentId.toString().startsWith('payment_')) {
+                console.log('📡 Calling deleteDebtPaymentFromBackend for payment id:', originalPaymentId);
+                await deleteDebtPaymentFromBackend(originalPaymentId);
             } else if (isLoggedIn && !navigator.onLine) {
-                addToSyncQueue({ id: id }, 'delete');
+                console.log('📱 Offline - adding payment deletion to sync queue');
+                addToSyncQueue({ id: originalPaymentId }, 'delete_payment');
             }
-            const result = await financeDB.deleteTransaction(id);
             
-            console.log('Delete result:', result);
-            
-            if (result.success) {
-                transactions = transactions.filter(t => t.id !== id);
+            // ลบจาก payments array ใน memory
+            const paymentIndex = payments.findIndex(p => p.id === originalPaymentId || p.id === originalPaymentId.toString());
+            if (paymentIndex !== -1) {
+                payments.splice(paymentIndex, 1);
+                console.log('✅ ลบ payment record ใน memory:', originalPaymentId);
                 
-                if (isDebtPayment && originalPaymentId) {
-                    console.log('🗑️ กำลังลบ payment record ที่เกี่ยวข้อง:', originalPaymentId);
-                    
-                    const paymentIndex = payments.findIndex(p => p.id === originalPaymentId);
-                    if (paymentIndex !== -1) {
-                        payments.splice(paymentIndex, 1);
-                        savePaymentsToStorage(); 
-                        
-                        if (!document.getElementById('page-debt').classList.contains('hidden')) {
-                            renderDebtPage();
-                        }
-                        
-                        console.log('✅ ลบ payment record สำเร็จ');
+                // บันทึก local storage
+                if (saveToLocalEnabled) {
+                    savePaymentsToStorage();
+                }
+            } else {
+                console.log('⚠️ Payment not found in memory:', originalPaymentId);
+            }
+        }
+        
+        // ✅ 2. ลบ transaction จาก backend (MySQL)
+        if (isLoggedIn && navigator.onLine && !id.toString().startsWith('tx_')) {
+            console.log('📡 Calling deleteTransactionFromBackend for id:', id);
+            await deleteTransactionFromBackend(id);
+        } else if (isLoggedIn && !navigator.onLine) {
+            console.log('📱 Offline - adding to sync queue');
+            addToSyncQueue({ id: id }, 'delete');
+        }
+        
+        // ✅ 3. ลบจากเครื่อง (IndexedDB + localStorage)
+        const result = await financeDB.deleteTransaction(id);
+        console.log('Delete result from financeDB:', result);
+        
+        if (result.success) {
+            // ลบจาก arrays
+            transactions = transactions.filter(t => t.id !== id);
+            if (backendTransactions && backendTransactions.length > 0) {
+                backendTransactions = backendTransactions.filter(t => t.id !== id);
+            }
+            
+            // ✅ ถ้าลบ initial balance transaction ให้ set account.initialBalance = 0
+            if (isInitialBalance && accountId) {
+                const account = accounts.find(a => a.id === accountId);
+                if (account) {
+                    const remainingInitial = transactions.some(t => 
+                        t.accountId === accountId && 
+                        t.isInitialBalance && 
+                        t.id !== id
+                    );
+                    if (!remainingInitial) {
+                        account.initialBalance = 0;
+                        saveAccounts();
+                        console.log(`✅ ลบ initial balance: set account.initialBalance = 0 for ${account.name}`);
                     }
                 }
-                
-                updateUI();
-                
-                const isCalendarTabActive = !document.getElementById('overview-calendar-content').classList.contains('hidden');
-                if (isCalendarTabActive) {
-                    renderCalendar();
-                }
-                
-                refreshAnalysisCharts();
-                
-                let toastMessage = "";
-                if (isDebtPayment) {
-                    toastMessage = "✅ ลบรายการผ่อนหนี้สำเร็จ (ทั้งสองฝั่ง)";
-                } else if (result.indexedDB && result.localStorage) {
-                    toastMessage = "✅ ลบรายการสำเร็จ (ทั้ง IndexedDB และ LocalStorage)";
-                } else if (result.indexedDB) {
-                    toastMessage = "✅ ลบจาก IndexedDB สำเร็จ";
-                } else if (result.localStorage) {
-                    toastMessage = "✅ ลบจาก LocalStorage สำเร็จ";
-                } else {
-                    toastMessage = "⚠️ ลบไม่สำเร็จจากทั้งสองที่";
-                }
-                
-                showToast(toastMessage);
-                
-            } else {
-                showToast("❌ ลบไม่สำเร็จ: " + (result.error || 'Unknown error'));
             }
             
-            hideConfirm(); 
+            // ✅ โหลดข้อมูลใหม่ทั้งหมดเพื่อความถูกต้อง
+            if (isLoggedIn && navigator.onLine) {
+                console.log('🔄 Reloading all data after deletion...');
+                await Promise.all([
+                    loadTransactionsFromBackend(),
+                    loadDebtsFromBackend(),
+                    loadPaymentsFromBackend()
+                ]);
+                transactions = backendTransactions;
+            }
             
-        } catch (error) {
-            console.error('Error deleting transaction:', error);
-            hideConfirm();
-            showToast("❌ ลบไม่สำเร็จ: " + error.message);
+            updateUI();
+            renderAccountsList();
+            renderCalendar();
+            refreshAnalysisCharts();
+            await clearRecentCache();
+            
+            // ✅ รีเฟรชหน้า debt ถ้าอยู่ในหน้านั้น
+            if (getCurrentPage() === 'debt') {
+                renderDebtPage();
+            }
+            
+            showToast("✅ ลบรายการสำเร็จ");
+        } else {
+            showToast("❌ ลบไม่สำเร็จ");
         }
-    });
+        
+        hideConfirm();
+        
+    } catch (error) {
+        console.error('Error deleting transaction:', error);
+        hideConfirm();
+        showToast("❌ ลบไม่สำเร็จ: " + error.message);
+    }
 }
 
         function toggleSettingsModal() { document.getElementById('settingsModal').classList.toggle('hidden'); }
@@ -9244,6 +10801,26 @@ function resetAllBudgetTargets() {
 
         function closePortionModal() { document.getElementById('budgetPortionModal').classList.add('hidden'); }
 
+async function clearRecentCache() {
+    try {
+        console.log('🗑️ Clearing recent cache...');
+        
+        // ลบ cache เก่า
+        localStorage.removeItem('fin_cache_recent');
+        
+        // โหลด cache ใหม่ (optional)
+        if (financeDB && financeDB.loadRecentToCache) {
+            await financeDB.loadRecentToCache();
+            console.log('✅ Recent cache reloaded');
+        } else {
+            console.log('✅ Recent cache cleared');
+        }
+        
+    } catch (error) {
+        console.warn('Failed to clear recent cache:', error);
+    }
+}
+
 function savePortion() {
     const k = getMonthKey(); 
     const v = parseFloat(document.getElementById('targetAmountInput').value) || 0;
@@ -9264,8 +10841,25 @@ function savePortion() {
     updateBudgetUI(); 
     closePortionModal();
 }
-        function showConfirm(t, d, onC) { document.getElementById('confirmTitle').innerText = t; document.getElementById('confirmDesc').innerText = d; document.getElementById('confirmModal').classList.remove('hidden'); document.getElementById('confirmBtn').onclick = onC; }
-        function hideConfirm() { document.getElementById('confirmModal').classList.add('hidden'); }
+function showConfirm(t, d, onC) { 
+    document.getElementById('confirmTitle').innerText = t; 
+    document.getElementById('confirmDesc').innerText = d; 
+    document.getElementById('confirmModal').classList.remove('hidden'); 
+    
+    // ✅ เก็บ callback และปิด modal หลังจาก callback ทำงานเสร็จ
+    document.getElementById('confirmBtn').onclick = async function() {
+        // เรียก callback (อาจเป็น async)
+        await onC();
+        // ปิด modal หลังจาก callback เสร็จ
+        hideConfirm();
+    };
+}
+
+function hideConfirm() { 
+    document.getElementById('confirmModal').classList.add('hidden'); 
+    // ✅ ลบ onclick เพื่อป้องกันการเรียกซ้ำ
+    document.getElementById('confirmBtn').onclick = null;
+}
 
 function updatePortionModalUnit(mode) {
     const unitElement = document.getElementById('targetUnit');
@@ -9477,7 +11071,7 @@ async function importFullData(data) {
             saveAccounts();
             showToast(`✅ นำเข้าบัญชี ${data.accounts.length} บัญชี`);
         }
-        
+        await clearRecentCache();
         if (data.customCategories) {
             customCategories = data.customCategories;
             localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
@@ -10553,6 +12147,7 @@ function updateAuthButtons() {
     const user = JSON.parse(localStorage.getItem('user'));
     const isLoggedInUser = !!(user && user.username);
     
+
     const desktopLoginBtn = document.getElementById('loginButton');
     const desktopLogoutDiv = document.getElementById('logoutButton');
     const usernameSpan = document.getElementById('loggedInUsername');
@@ -10567,36 +12162,39 @@ function updateAuthButtons() {
         usernameSpan.textContent = user.username || '';
     }
     
+
     const mobileLoginBtn = document.getElementById('mobileLoginBtn');
-    const mobileLogoutDiv = document.getElementById('mobileLogoutBtn');
+    const mobileLogoutBtn = document.getElementById('mobileLogoutBtn');
     const mobileUsernameSpan = document.getElementById('mobileUsername');
     
     if (mobileLoginBtn) {
         mobileLoginBtn.classList.toggle('hidden', isLoggedInUser);
     }
-    if (mobileLogoutDiv) {
-        mobileLogoutDiv.classList.toggle('hidden', !isLoggedInUser);
+    if (mobileLogoutBtn) {
+        mobileLogoutBtn.classList.toggle('hidden', !isLoggedInUser);
     }
     if (mobileUsernameSpan && user) {
         mobileUsernameSpan.textContent = user.username || '';
         mobileUsernameSpan.classList.toggle('hidden', !isLoggedInUser);
     }
     
+ 
     const mobileSettingsLoginBtn = document.getElementById('mobileSettingsLoginBtn');
-    const mobileSettingsLogoutDiv = document.getElementById('mobileSettingsLogoutBtn');
+    const mobileSettingsLogoutBtn = document.getElementById('mobileSettingsLogoutBtn');
     const mobileSettingsUsernameSpan = document.getElementById('mobileSettingsUsername');
     
     if (mobileSettingsLoginBtn) {
         mobileSettingsLoginBtn.classList.toggle('hidden', isLoggedInUser);
     }
-    if (mobileSettingsLogoutDiv) {
-        mobileSettingsLogoutDiv.classList.toggle('hidden', !isLoggedInUser);
+    if (mobileSettingsLogoutBtn) {
+        mobileSettingsLogoutBtn.classList.toggle('hidden', !isLoggedInUser);
     }
     if (mobileSettingsUsernameSpan && user) {
         mobileSettingsUsernameSpan.textContent = user.username || '';
         mobileSettingsUsernameSpan.classList.toggle('hidden', !isLoggedInUser);
     }
     
+
     if (typeof updateLocalSaveCheckbox === 'function') {
         updateLocalSaveCheckbox();
     }
@@ -11190,7 +12788,7 @@ function updateTransferBalanceDisplays() {
     const toId = document.getElementById('transferToAccount').value;
     
     if (fromId) {
-        const fromBalance = getAccountBalance(fromId);
+        const fromBalance = getAccountBalance(fromId); 
         document.getElementById('fromAccountBalance').innerHTML = 
             `ยอดคงเหลือ: <span class="font-bold ${fromBalance >= 0 ? 'text-emerald-600' : 'text-rose-600'}">฿${Math.abs(fromBalance).toLocaleString()}</span>`;
     } else {
@@ -11199,12 +12797,71 @@ function updateTransferBalanceDisplays() {
     }
     
     if (toId) {
-        const toBalance = getAccountBalance(toId);
+        const toBalance = getAccountBalance(toId); 
         document.getElementById('toAccountBalance').innerHTML = 
             `ยอดคงเหลือ: <span class="font-bold ${toBalance >= 0 ? 'text-emerald-600' : 'text-rose-600'}">฿${Math.abs(toBalance).toLocaleString()}</span>`;
     } else {
         document.getElementById('toAccountBalance').innerHTML = 
             `ยอดคงเหลือ: --`;
+    }
+}
+
+// ============================================
+// TRANSFER FUNCTIONS (เพิ่ม/แก้ไข)
+// ============================================
+
+async function saveTransferToBackend(transactionData) {
+    if (!isLoggedIn || !navigator.onLine) {
+        if (!saveToLocalEnabled) {
+            showToast('❌ ไม่สามารถบันทึกได้ (ต้อง online เพื่อบันทึกที่ MySQL)', 'error');
+            return false;
+        }
+        addToSyncQueue(transactionData, 'create');
+        showToast('📦 ออฟไลน์: จะบันทึกเมื่อกลับมาออนไลน์', 'info');
+        return false;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/transactions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: currentUser.id,
+                type: transactionData.type,
+                amount: transactionData.amount,
+                desc: transactionData.desc,
+                category: transactionData.category,
+                tag: transactionData.tag || '',
+                icon: transactionData.icon,
+                rawDate: transactionData.rawDate,
+                month_key: transactionData.monthKey,
+                accountId: transactionData.accountId,
+                transferToAccountId: transactionData.transferToAccountId || null,
+                transferType: transactionData.transferType || null,
+                isDebtPayment: transactionData.isDebtPayment || false,
+                originalDebtId: transactionData.originalDebtId || null
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            console.log('✅ บันทึก transfer ที่ backend สำเร็จ');
+            if (result.id && transactionData.id.startsWith('transfer_')) {
+                transactionData.id = result.id.toString();
+                transactionData.backendId = result.id;
+            }
+            return { success: true, id: result.id };
+        } else {
+            throw new Error(result.error || 'Unknown error');
+        }
+        
+    } catch (error) {
+        console.error('❌ บันทึก transfer ไม่สำเร็จ:', error);
+        if (saveToLocalEnabled) {
+            addToSyncQueue(transactionData, 'create');
+        }
+        return { success: false, error: error.message };
     }
 }
 
@@ -11216,8 +12873,11 @@ async function transferBetweenAccounts() {
     const incomeCategory = document.getElementById('transferIncomeCategory')?.value || '';
     const fromBalance = getAccountBalance(fromId);
     const transactionId = 'transfer_' + Date.now();
+    const receiveTransactionId = 'transfer_receive_' + Date.now();
     const now = new Date().toISOString().split('T')[0];
     const currentMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    
+    // Validation
     if (!fromId) {
         showToast("กรุณาเลือกบัญชีต้นทาง");
         return;
@@ -11233,7 +12893,6 @@ async function transferBetweenAccounts() {
         return;
     }
     
-
     if (fromBalance < amount) {
         showToast(`❌ ยอดเงินไม่พอ (มีแค่ ฿${fromBalance.toLocaleString()})`);
         return;
@@ -11252,42 +12911,65 @@ async function transferBetweenAccounts() {
         return;
     }
     
-const transferTransaction = {
-    id: transactionId,
-    amount: amount,
-    type: 'transfer',
-    transferType: transferType,
-    transferAsIncome: false,  
-    category: transferType === 'as_income' ? incomeCategory : 'โอนเงิน',
-    icon: transferType === 'as_income' ? '💰' : '🔄',
-    desc: transferType === 'as_income' 
-        ? `โอนไป ${toAccount.name} (${incomeCategory})`
-        : `โอนไป ${toAccount.name}`,
-    tag: '',
-    rawDate: now,
-    monthKey: currentMonthKey,
-    date: now,
-    accountId: fromId,          
-    transferToAccountId: toId,    
-    accountId: fromId,
-    transferToAccountId: toId,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-};
+    // ✅ สร้าง transaction ฝั่งต้นทาง
+    const transferTransaction = {
+        id: transactionId,
+        amount: amount,
+        type: 'transfer',
+        transferType: transferType,
+        category: transferType === 'as_income' ? incomeCategory : 'โอนเงิน',
+        icon: transferType === 'as_income' ? '💰' : '🔄',
+        desc: transferType === 'as_income' 
+            ? `โอนไป ${toAccount.name} (${incomeCategory})`
+            : `โอนไป ${toAccount.name}`,
+        tag: '',
+        rawDate: now,
+        monthKey: currentMonthKey,
+        date: now,
+        accountId: fromId,
+        transferToAccountId: toId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        owner_type: isLoggedIn ? 'user' : 'guest', 
+        owner_id: isLoggedIn ? currentUser.id : getGuestId()
+    };
     
-    try {
-        const result = await financeDB.saveTransaction(transferTransaction);
-        
-        if (result.success) {
-            if (transferType === 'as_income') {
-                const receiveTransactionId = 'transfer_receive_' + Date.now();
-const receiveTransaction = {
+    // ✅ สร้าง transaction ฝั่งรับ (ทั้ง internal และ as_income)
+    let receiveTransaction = null;
+    
+    if (transferType === 'as_income') {
+        // as_income: ฝั่งรับเป็น income
+        receiveTransaction = {
+            id: receiveTransactionId,
+            amount: amount,
+            type: 'income',
+            transferType: 'receive_income',
+            category: incomeCategory,
+            icon: '💰',
+            desc: `รับโอนจาก ${fromAccount.name}`,
+            tag: '',
+            rawDate: now,
+            monthKey: currentMonthKey,
+            date: now,
+            accountId: toId,
+            transferFromAccountId: fromId,
+            originalTransferId: transactionId,
+            isTransferIncome: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            owner_type: isLoggedIn ? 'user' : 'guest',
+            owner_id: isLoggedIn ? currentUser.id : getGuestId()
+        };
+    } else {
+
+// internal transfer: ฝั่งรับเป็น transfer (บวกเงิน)
+receiveTransaction = {
     id: receiveTransactionId,
     amount: amount,
-    type: 'income',
-    transferType: 'receive_income',
-    category: incomeCategory,
-    icon: '💰',
+    type: 'transfer',
+    transferType: 'internal_receive',
+    category: 'รับโอนเงิน',
+    icon: '🔄',
     desc: `รับโอนจาก ${fromAccount.name}`,
     tag: '',
     rawDate: now,
@@ -11295,47 +12977,87 @@ const receiveTransaction = {
     date: now,
     accountId: toId,
     transferFromAccountId: fromId,
-    isTransferIncome: true,  
+    transferToAccountId: null,
     originalTransferId: transactionId,
+    isTransferIncome: false,
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    owner_type: isLoggedIn ? 'user' : 'guest',
+    owner_id: isLoggedIn ? currentUser.id : getGuestId()
 };
-                
-                await financeDB.saveTransaction(receiveTransaction);
-                console.log('✅ บันทึก transaction ฝั่งรับเป็นรายรับสำเร็จ');
-            }
-            
-         
-            try {
-                const reloadMonthKey = getMonthKey();
-                transactions = await financeDB.getTransactionsByMonth(reloadMonthKey);
-                console.log('✅ โหลด transactions ใหม่:', transactions.length, 'รายการ');
-            } catch (dbError) {
-                console.error('Failed to reload from DB:', dbError);
-                const exists = transactions.some(t => t.id === transferTransaction.id);
-                if (!exists) {
-                    transactions.unshift(transferTransaction);
-                }
-            }
-            
-            document.getElementById('transferAmount').value = '';
-            updateTransferBalanceDisplays();
-            loadTransferHistory();
-            renderAccountsList();
-            
-            updateUI();
-            refreshAnalysisCharts();
-            
-            showToast(`✅ โอนเงินสำเร็จ ฿${amount.toLocaleString()} ${transferType === 'as_income' ? '(นับเป็นรายรับ)' : ''}`);
-            
-        } else {
-            showToast("❌ โอนเงินไม่สำเร็จ");
+    }
+    
+    // ✅ ตรวจสอบ saveToLocalEnabled
+    const saveToLocalCheckbox = document.getElementById('saveToLocalCheckbox');
+    const shouldSaveToLocal = saveToLocalCheckbox ? saveToLocalCheckbox.checked : true;
+    
+    console.log('📊 Transfer - fromId:', fromId);
+    console.log('📊 Transfer - toId:', toId);
+    console.log('📊 Transfer - transferType:', transferType);
+    console.log('📊 Transfer - transferTransaction:', transferTransaction);
+    console.log('📊 Transfer - receiveTransaction:', receiveTransaction);
+    console.log('📊 Transfer - saveToLocalEnabled:', shouldSaveToLocal);
+    
+    try {
+    // 1. บันทึกที่ MySQL (ถ้า login และออนไลน์)
+    if (isLoggedIn && navigator.onLine) {
+        console.log('🌐 บันทึก transfer ไป MySQL...');
+        
+        await saveTransactionToBackend(transferTransaction);
+        if (receiveTransaction) {
+            await saveTransactionToBackend(receiveTransaction);
         }
         
-    } catch (error) {
-        console.error('Error transferring:', error);
-        showToast("❌ โอนเงินไม่สำเร็จ: " + error.message);
+        console.log('✅ บันทึก MySQL สำเร็จ');
+    } else if (isLoggedIn && !navigator.onLine && !shouldSaveToLocal) {
+        showToast('❌ ไม่สามารถบันทึกการโอนได้ (ต้อง online เพื่อบันทึกที่ MySQL)', 'error');
+        return;
+    } else if (isLoggedIn && !navigator.onLine && shouldSaveToLocal) {
+        addToSyncQueue(transferTransaction, 'create');
+        if (receiveTransaction) {
+            addToSyncQueue(receiveTransaction, 'create');
+        }
+        showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
     }
+    
+    // 2. บันทึกที่ Local (เฉพาะเมื่อติ๊ก checkbox หรือ Guest mode)
+    if (!isLoggedIn || shouldSaveToLocal) {
+        console.log('💾 บันทึก transfer ลงเครื่อง...');
+        
+        await financeDB.saveTransaction(transferTransaction);
+        if (receiveTransaction) {
+            await financeDB.saveTransaction(receiveTransaction);
+        }
+        
+        console.log('✅ บันทึก Local สำเร็จ');
+    } else {
+        console.log('⏭️ ข้ามการบันทึก Local (checkbox ไม่ติ๊ก)');
+    }
+    
+    // ✅ โหลดข้อมูลใหม่เพียงครั้งเดียว (หลังบันทึกเสร็จ)
+    if (isLoggedIn && navigator.onLine) {
+        await loadTransactionsFromBackend();
+        transactions = backendTransactions;
+    } else {
+        const freshTransactions = await financeDB.getAllTransactions();
+        transactions = freshTransactions;
+    }
+    
+    // 3. รีเฟรช UI
+    document.getElementById('transferAmount').value = '';
+    updateTransferBalanceDisplays();
+    loadTransferHistory();
+    renderAccountsList();
+    updateUI();
+    refreshAnalysisCharts();
+    
+    const toastMsg = `✅ โอนเงินสำเร็จ ฿${amount.toLocaleString()} ${transferType === 'as_income' ? '(นับเป็นรายรับ)' : ''}`;
+    showToast(toastMsg);
+    
+} catch (error) {
+    console.error('❌ Error transferring:', error);
+    showToast("❌ โอนเงินไม่สำเร็จ: " + error.message);
+}
 }
 
 function loadTransferHistory() {
@@ -11349,7 +13071,7 @@ const transfers = transactions
             const dateB = new Date(b.createdAt || b.rawDate || b.date);
             return dateB - dateA; 
         })
-        .slice(0, 20); ฃ
+        .slice(0, 20);
     
     if (transfers.length === 0) {
         document.getElementById('transferHistory').classList.add('hidden');
@@ -13362,120 +15084,113 @@ let currentUser = null;
 
 let saveToLocalEnabled = true;
 
-function updateLocalSaveCheckbox() {
-    const checkbox = document.getElementById('saveToLocalCheckbox');
-    const hint = document.getElementById('localSaveHint');
-    
-    console.log('🔄 updateLocalSaveCheckbox() called');
-    
-    if (!checkbox) return;
-    
-    if (!isLoggedIn) {
-        checkbox.checked = true;
-        checkbox.disabled = true;
-        saveToLocalEnabled = true;
-        
-        checkbox.closest('#localSaveOption')?.classList.add('opacity-50');
-        
-        if (hint) {
-            hint.innerHTML = '🔒 โหมดผู้เยี่ยมชม: บันทึกในเครื่องเท่านั้น';
-            hint.className = 'text-[10px] text-amber-500 mt-0.5';
-        }
-    } else {
-        checkbox.disabled = false;
-        checkbox.closest('#localSaveOption')?.classList.remove('opacity-50');
-        
-        const savedPreference = localStorage.getItem('fin_save_local_preference');
-        checkbox.checked = savedPreference !== null ? savedPreference === 'true' : true;
-        saveToLocalEnabled = checkbox.checked;
-        
-        if (hint) {
-            hint.innerHTML = saveToLocalEnabled 
-                ? '💾 บันทึกทั้ง MySQL และในเครื่อง'
-                : '☁️ บันทึกเฉพาะ MySQL (ไม่เก็บในเครื่อง)';
-            hint.className = 'text-[10px] text-slate-400 mt-0.5';
-        }
-        
-        checkbox.removeEventListener('change', handleCheckboxChange);
-        checkbox.addEventListener('change', handleCheckboxChange);
-    }
-    
-    if (window.financeDB) {
-        window.financeDB.setSaveToLocalEnabled(saveToLocalEnabled);
-    }
-}
+
 
 function handleCheckboxChange(e) {
     saveToLocalEnabled = e.target.checked;
     localStorage.setItem('fin_save_local_preference', e.target.checked);
     
+
+    const desktopCheckbox = document.getElementById('saveToLocalCheckbox');
+    const mobileCheckbox = document.getElementById('mobileSaveToLocalCheckbox');
+    
+    if (desktopCheckbox && desktopCheckbox !== e.target) {
+        desktopCheckbox.checked = e.target.checked;
+    }
+    if (mobileCheckbox && mobileCheckbox !== e.target) {
+        mobileCheckbox.checked = e.target.checked;
+    }
+    
+
     if (window.financeDB) {
         window.financeDB.setSaveToLocalEnabled(saveToLocalEnabled);
     }
     
-    const hint = document.getElementById('localSaveHint');
-    if (hint) {
-        hint.innerHTML = saveToLocalEnabled 
-            ? '💾 บันทึกทั้ง MySQL และในเครื่อง'
-            : '☁️ บันทึกเฉพาะ MySQL (ไม่เก็บในเครื่อง)';
-    }
-    
-    console.log('📌 Checkbox changed:', saveToLocalEnabled ? '✅ บันทึกทั้งสองที่' : '☁️ บันทึกเฉพาะ MySQL');
+    console.log('📌 Checkbox changed:', e.target.checked, 'saveToLocalEnabled =', saveToLocalEnabled);
     
     showToast(saveToLocalEnabled ? 
-        '✅ บันทึกทั้ง MySQL และในเครื่อง' : 
-        '☁️ บันทึกเฉพาะ MySQL', 'info');
+        '✅ บันทึกทั้ง MySQL และเครื่อง' : 
+        '☁️ บันทึกเฉพาะ MySQL (ไม่เก็บในเครื่อง)', 'info');
 }
 
 function updateLocalSaveCheckbox() {
-    const checkbox = document.getElementById('saveToLocalCheckbox');
+    const isLoggedInUser = !!(localStorage.getItem('user'));
+    
+    const desktopCheckbox = document.getElementById('saveToLocalCheckbox');
+    const mobileCheckbox = document.getElementById('mobileSaveToLocalCheckbox');
     const hint = document.getElementById('localSaveHint');
+    const mobileHint = document.getElementById('mobileLocalSaveHint');
     
-    console.log('🔄 updateLocalSaveCheckbox() called');
-    console.log('📦 checkbox found:', !!checkbox);
-    console.log('🔐 isLoggedIn:', isLoggedIn);
-    
-    if (!checkbox) return;
-    
-    if (!isLoggedIn) {
-        checkbox.checked = true;
-        checkbox.disabled = true;
-        saveToLocalEnabled = true;
-        
-        if (window.financeDB) {
-            window.financeDB.setSaveToLocalEnabled(true);
-        }
-        
-        if (hint) {
-            hint.innerHTML = '🔒 บังคับบันทึกในเครื่อง (โหมดผู้เยี่ยมชม)';
-            hint.className = 'text-[10px] text-amber-500 mt-0.5';
-        }
-    } else {
-        checkbox.disabled = false;
-        
-        const savedPreference = localStorage.getItem('fin_save_local_preference');
-        if (savedPreference !== null) {
-            checkbox.checked = savedPreference === 'true';
+    if (desktopCheckbox) {
+        if (!isLoggedInUser) {
+            desktopCheckbox.checked = true;
+            desktopCheckbox.disabled = true;
+            saveToLocalEnabled = true;
+            if (hint) {
+                hint.innerHTML = '🔒 บังคับบันทึกในเครื่อง (โหมดผู้เยี่ยมชม)';
+                hint.className = 'text-[10px] text-amber-500 mt-0.5';
+            }
         } else {
-            checkbox.checked = true;
+            desktopCheckbox.disabled = false;
+            
+            const savedPreference = localStorage.getItem('fin_save_local_preference');
+            
+            if (savedPreference === null) {
+                desktopCheckbox.checked = false;
+                saveToLocalEnabled = false;
+                localStorage.setItem('fin_save_local_preference', 'false');
+            } else {
+                desktopCheckbox.checked = savedPreference === 'true';
+                saveToLocalEnabled = desktopCheckbox.checked;
+            }
+            
+            if (hint) {
+                hint.innerHTML = '💡 ถ้าไม่ติ๊ก จะบันทึกเฉพาะบนเซิร์ฟเวอร์ (MySQL)';
+                hint.className = 'text-[10px] text-slate-400 mt-0.5';
+            }
+            
+            desktopCheckbox.removeEventListener('change', handleCheckboxChange);
+            desktopCheckbox.addEventListener('change', handleCheckboxChange);
         }
-        
-        saveToLocalEnabled = checkbox.checked;
-        
-        if (window.financeDB) {
-            window.financeDB.setSaveToLocalEnabled(saveToLocalEnabled);
-        }
-        
-        if (hint) {
-            hint.innerHTML = '💡 ถ้าไม่ติ๊ก จะบันทึกเฉพาะบนเซิร์ฟเวอร์ (MySQL)';
-            hint.className = 'text-[10px] text-slate-400 mt-0.5';
-        }
-        
-        checkbox.removeEventListener('change', handleCheckboxChange);
-        checkbox.addEventListener('change', handleCheckboxChange);
     }
     
-    console.log('💾 FinanceDB saveToLocalEnabled =', window.financeDB?.saveToLocalEnabled);
+    if (mobileCheckbox) {
+        if (!isLoggedInUser) {
+            mobileCheckbox.checked = true;
+            mobileCheckbox.disabled = true;
+            if (mobileHint) {
+                mobileHint.innerHTML = '🔒 บังคับบันทึกในเครื่อง (โหมดผู้เยี่ยมชม)';
+                mobileHint.className = 'text-[10px] text-amber-500 mt-0.5';
+            }
+        } else {
+            mobileCheckbox.disabled = false;
+            
+            const savedPreference = localStorage.getItem('fin_save_local_preference');
+            
+            if (savedPreference === null) {
+                mobileCheckbox.checked = false;
+                saveToLocalEnabled = false;
+                localStorage.setItem('fin_save_local_preference', 'false');
+            } else {
+                mobileCheckbox.checked = savedPreference === 'true';
+                saveToLocalEnabled = mobileCheckbox.checked;
+            }
+            
+            if (mobileHint) {
+                mobileHint.innerHTML = '💡 ถ้าไม่ติ๊ก จะบันทึกเฉพาะบนเซิร์ฟเวอร์ (MySQL)';
+                mobileHint.className = 'text-[10px] text-slate-400 mt-0.5';
+            }
+            
+            mobileCheckbox.removeEventListener('change', handleCheckboxChange);
+            mobileCheckbox.addEventListener('change', handleCheckboxChange);
+        }
+    }
+    
+    if (window.financeDB) {
+        window.financeDB.setSaveToLocalEnabled(saveToLocalEnabled);
+    }
+    
+    console.log(`💾 saveToLocalEnabled = ${saveToLocalEnabled}`);
 }
 
 async function cleanupLocalCache() {
@@ -13498,29 +15213,7 @@ async function cleanupLocalCache() {
     console.log(`✅ ล้าง cache เสร็จ: เหลือ ${backendTx.length} รายการใน fin_tx_v5`);
 }
 
-async function loadUserDataFromBackend() {
-    if (!isLoggedIn || !navigator.onLine) return;
-    
-    showToast('🔄 กำลังโหลดข้อมูลจากเซิร์ฟเวอร์...', 'info');
-    
-    try {
-        await loadTransactionsFromBackend();
-        await loadAccountsFromBackend();
-        await loadCategoriesFromBackend();
-        await loadBudgetsFromBackend();
-        await loadDebtsFromBackend();
-        await loadTagsFromBackend();
-        
-        await cleanupLocalCache();
-        
-        showToast('✅ โหลดข้อมูลจากเซิร์ฟเวอร์สำเร็จ', 'success');
-        updateUI();
-        
-    } catch (error) {
-        console.error('Error loading user data:', error);
-        showToast('⚠️ โหลดข้อมูลบางส่วนไม่สำเร็จ', 'info');
-    }
-}
+
 
 
 function injectLocalSaveCheckbox() {
@@ -13696,6 +15389,7 @@ async function login() {
         const data = await response.json();
         
         if (response.ok) {
+            // ลบข้อมูล user เก่า
             if (currentUser?.id) {
                 const allTx = await financeDB.getAllTransactions();
                 const oldUserTx = allTx.filter(t => t.owner_type === 'user' && t.owner_id === currentUser.id);
@@ -13711,15 +15405,39 @@ async function login() {
             hideLoginModal();
             updateAuthButtons();
             
-            showToast('🔄 กำลังโหลดข้อมูลจากเซิร์ฟเวอร์...', 'info');
-            await loadTransactionsFromBackend();
-            
-            await loadInitialData();
-            
+            // ✅ โหลด checkbox state
             updateLocalSaveCheckbox();
             
+            showToast('🔄 กำลังโหลดข้อมูล...', 'info');
+            
+            // ✅ โหลดข้อมูลทั้งหมดจาก MySQL
+            await Promise.all([
+                loadAccountsFromBackend(),
+                loadCategoriesFromBackend(),
+                loadTransactionsFromBackend(),
+                loadDebtsFromBackend(),      // ✅ เพิ่ม
+                loadPaymentsFromBackend()    // ✅ เพิ่ม
+            ]);
+            
+            transactions = backendTransactions;
+            
+            // ✅ อัปเดต UI
+            updateAccountSelect();
+            updateMobileAccountSelect();
+            updateCategorySelect();
             updateUI();
             renderCalendar();
+            renderAccountsList();
+            
+            // ✅ รีเฟรชหน้าปัจจุบัน
+            const currentPage = getCurrentPage();
+            switch(currentPage) {
+                case 'budget': updateBudgetUI(); break;
+                case 'analysis': refreshAnalysisCharts(); break;
+                case 'yearly': updateYearlyUI(); break;
+                case 'debt': renderDebtPage(); break;
+                case 'accounts': renderAccountsList(); break;
+            }
             
             showToast('✅ เข้าสู่ระบบสำเร็จ!', 'success');
             
@@ -13735,6 +15453,7 @@ async function login() {
 
 
 async function loadUserDataFromBackend() {
+    console.log('🚀 loadUserDataFromBackend START');
     if (!isLoggedIn || !navigator.onLine) {
         console.log('⏳ ไม่สามารถโหลดข้อมูลได้ (ไม่มีเน็ตหรือยังไม่ login)');
         return;
@@ -13804,15 +15523,13 @@ async function loadTransactionsFromBackend() {
         const serverTransactions = await response.json();
         console.log(`📦 ข้อมูลจาก backend: ${serverTransactions.length} รายการ`);
         
-        if (!Array.isArray(serverTransactions)) {
-            console.error('Server response is not an array:', serverTransactions);
-            return;
-        }
-        
         backendTransactions = [];
         
         for (const tx of serverTransactions) {
             if (!tx || !tx.id) continue;
+            
+            // ✅ Debug: แสดงค่าที่ได้รับ
+            console.log(`🔍 Transaction ${tx.id}: isDebtPayment=${tx.isDebtPayment}, originalPaymentId=${tx.originalPaymentId}`);
             
             const formattedTx = {
                 id: tx.id.toString(),
@@ -13825,85 +15542,247 @@ async function loadTransactionsFromBackend() {
                 rawDate: tx.rawDate || tx.date || '',
                 monthKey: tx.monthKey || '',
                 date: tx.date || tx.rawDate || '',
-                accountId: tx.accountId ? tx.accountId.toString() : null,
+                accountId: tx.accountId,
+                transferToAccountId: tx.transferToAccountId || null,
+                transferFromAccountId: tx.transferFromAccountId || null,
+                transferType: tx.transferType || null,
+                isInitialBalance: tx.isInitialBalance || false,
+                isDebtPayment: tx.isDebtPayment || false,           // ✅ สำคัญ!
+                originalDebtId: tx.originalDebtId || null,          // ✅ สำคัญ!
+                originalPaymentId: tx.originalPaymentId || null,    // ✅ สำคัญ!
                 backendId: tx.id,
                 isFromBackend: true,
                 createdAt: tx.createdAt || new Date().toISOString(),
                 updatedAt: tx.updatedAt || new Date().toISOString(),
-                
                 owner_type: 'user',
                 owner_id: currentUser.id
             };
             
             backendTransactions.push(formattedTx);
         }
+
+        transactions = backendTransactions;
         
         console.log(`✅ โหลดข้อมูลจาก backend สำเร็จ: ${backendTransactions.length} รายการ`);
+        console.log(`🔍 Sample transaction:`, transactions[0]);  // ✅ เพิ่ม debug
         
-        if (saveToLocalEnabled) {
-            for (const tx of backendTransactions) {
-                await financeDB.saveTransaction(tx);
-            }
-            console.log(`✅ บันทึกข้อมูลลงเครื่องแล้ว: ${backendTransactions.length} รายการ`);
+        // รีเฟรช UI
+        updateUI();
+        renderCalendar();
+        
+        const currentPage = getCurrentPage();
+        if (currentPage === 'accounts') {
+            renderAccountsList();
+        }
+        switch(currentPage) {
+            case 'budget':
+                updateBudgetUI();
+                break;
+            case 'analysis':
+                refreshAnalysisCharts();
+                break;
+            case 'yearly':
+                updateYearlyUI();
+                if (document.getElementById('y-tab-tags').classList.contains('active')) {
+                    updateYearlyTagsUI();
+                }
+                break;
+            case 'debt':
+                renderDebtPage();
+                break;
+            case 'accounts':
+                renderAccountsList();
+                break;
         }
         
     } catch (error) {
         console.error('Error loading transactions from backend:', error);
     }
 }
+function findTransactionById(id) {
+    let tx = transactions.find(t => t.id === id);
+    
+    if (!tx && backendTransactions && backendTransactions.length > 0) {
+        tx = backendTransactions.find(t => t.id === id);
+    }
+    
+    return tx;
+}
 
-async function loadAccountsFromBackend() {
+
+async function syncMySQLtoLocal() {
+    if (!isLoggedIn) {
+        showToast('⚠️ กรุณาเข้าสู่ระบบก่อน', 'error');
+        return;
+    }
+    
+    if (!navigator.onLine) {
+        showToast('📱 ไม่มีอินเทอร์เน็ต, ไม่สามารถซิงค์ได้', 'error');
+        return;
+    }
+    
+    const saveToLocalCheckbox = document.getElementById('saveToLocalCheckbox');
+    const isSaveToLocalEnabled = saveToLocalCheckbox ? saveToLocalCheckbox.checked : false;
+    
+    if (!isSaveToLocalEnabled) {
+        showToast('⚠️ กรุณาตี๊ก "บันทึกลงเครื่อง" ก่อนซิงค์', 'info');
+        return;
+    }
+    
+    showToast('🔄 กำลังซิงค์ข้อมูลจาก MySQL ลงเครื่อง...', 'info');
+    
     try {
-        const response = await fetch(`${API_URL}/accounts/${currentUser.id}`);
-        const serverAccounts = await response.json();
+        const response = await fetch(`${API_URL}/transactions/${currentUser.id}`);
         
-        console.log(`📥 โหลด ${serverAccounts.length} accounts จาก backend`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
         
-        for (const acc of serverAccounts) {
-            acc.id = acc.id.toString();  
-            
-            const exists = accounts.some(a => a.id === acc.id);
-            if (!exists) {
-                accounts.push(acc);
+        const serverTransactions = await response.json();
+        
+        if (!Array.isArray(serverTransactions)) {
+            throw new Error('ข้อมูลไม่ถูกต้อง');
+        }
+        
+        let savedCount = 0;
+        let errorCount = 0;
+        
+        for (const tx of serverTransactions) {
+            try {
+                const formattedTx = {
+                    id: tx.id.toString(),
+                    amount: parseFloat(tx.amount) || 0,
+                    type: tx.type || 'expense',
+                    category: tx.category || 'อื่นๆ',
+                    icon: tx.icon || '📝',
+                    desc: tx.desc || tx.category || '',
+                    tag: tx.tag || '',
+                    rawDate: tx.rawDate || tx.date || '',
+                    monthKey: tx.monthKey || '',
+                    date: tx.date || tx.rawDate || '',
+                    accountId: tx.accountId ? tx.accountId.toString() : null,
+                    backendId: tx.id,
+                    isFromBackend: true,
+                    createdAt: tx.createdAt || new Date().toISOString(),
+                    updatedAt: tx.updatedAt || new Date().toISOString(),
+                    owner_type: 'user',
+                    owner_id: currentUser.id
+                };
+                
+                await financeDB.saveTransaction(formattedTx);
+                savedCount++;
+                
+                if (savedCount % 50 === 0) {
+                    showToast(`🔄 ซิงค์... ${savedCount}/${serverTransactions.length}`);
+                }
+                
+            } catch (txError) {
+                console.error('❌ บันทึก transaction ล้มเหลว:', txError);
+                errorCount++;
             }
         }
         
-        saveAccounts();
+        await loadInitialData();
+        updateUI();
+        renderCalendar();
+        refreshAnalysisCharts();
+        
+        showToast(`✅ ซิงค์สำเร็จ: ${savedCount} รายการ (ผิดพลาด ${errorCount})`, 'success');
+        
+    } catch (error) {
+        console.error('❌ ซิงค์ล้มเหลว:', error);
+        showToast(`❌ ซิงค์ไม่สำเร็จ: ${error.message}`, 'error');
+    }
+}
+
+async function loadAccountsFromBackend() {
+    if (!isLoggedIn || !navigator.onLine) return;
+    
+    try {
+        const response = await fetch(`${API_URL}/accounts/${currentUser.id}`);
+        
+        if (!response.ok) {
+            console.warn('Failed to load accounts from backend');
+            return;
+        }
+        
+        const serverAccounts = await response.json();
+        
+        if (serverAccounts.length > 0) {
+            accounts = serverAccounts.map(acc => ({
+                id: acc.id,
+                name: acc.name,
+                type: acc.type,
+                icon: acc.icon,
+                initialBalance: acc.initialBalance || 0,  // ✅ ต้องมี
+                isDefault: acc.isDefault || false,
+                createdAt: acc.createdAt,
+                updatedAt: acc.updatedAt
+            }));
+            
+            const defaultAccount = accounts.find(a => a.isDefault);
+            if (defaultAccount) {
+                currentAccountId = defaultAccount.id;
+                localStorage.setItem('fin_current_account', currentAccountId);
+            } else if (accounts.length > 0) {
+                currentAccountId = accounts[0].id;
+            }
+            
+            saveAccounts();
+            
+            console.log(`✅ โหลด ${accounts.length} accounts จาก backend`);
+        } else {
+            console.log('⚠️ ไม่มี accounts จาก backend');
+        }
         
     } catch (error) {
         console.error('Error loading accounts:', error);
-        throw error;
     }
 }
 
 async function loadCategoriesFromBackend() {
+    if (!isLoggedIn || !navigator.onLine) return;
+    
     try {
         const response = await fetch(`${API_URL}/categories/${currentUser.id}`);
+        
+        if (!response.ok) {
+            console.warn('Failed to load categories from backend');
+            return;
+        }
+        
         const serverCategories = await response.json();
         
-        console.log(`📥 โหลด categories จาก backend:`, serverCategories);
-        
+        // ✅ ตรวจสอบว่ามีข้อมูลหรือไม่
         if (serverCategories && 
-            ((serverCategories.income && serverCategories.income.length > 0) ||
-             (serverCategories.spending && serverCategories.spending.length > 0) ||
-             (serverCategories.investment && serverCategories.investment.length > 0))) {
+            (serverCategories.income?.length > 0 ||
+             serverCategories.spending?.length > 0 ||
+             serverCategories.investment?.length > 0)) {
             
             customCategories = {
                 income: serverCategories.income || [],
                 spending: serverCategories.spending || [],
                 investment: serverCategories.investment || []
             };
+            
+            // ✅ บันทึกลง localStorage
+            localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
+            
+            console.log(`✅ โหลด categories จาก backend:`, {
+                income: customCategories.income.length,
+                spending: customCategories.spending.length,
+                investment: customCategories.investment.length
+            });
         } else {
-            console.log('⚠️ ไม่พบข้อมูล categories จาก backend, ใช้ค่าเริ่มต้น');
+            console.log('⚠️ ไม่มี categories จาก backend, ใช้ default');
             customCategories = JSON.parse(JSON.stringify(defaultCategories));
         }
-        
-        localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
         
         updateCategorySelect();
         
     } catch (error) {
         console.error('Error loading categories:', error);
+        customCategories = JSON.parse(JSON.stringify(defaultCategories));
     }
 }
 
@@ -13996,21 +15875,42 @@ async function loadBudgetsFromBackend() {
     }
 }
 
+
+
 async function loadDebtsFromBackend() {
+    console.log('🚀 loadDebtsFromBackend START, currentUser.id =', currentUser?.id);
+    console.log('🚀 loadDebtsFromBackend START, saveToLocalEnabled =', saveToLocalEnabled);
+    
     try {
         const response = await fetch(`${API_URL}/debts/${currentUser.id}`);
         const serverDebts = await response.json();
         
         console.log(`📥 โหลด ${serverDebts.length} debts จาก backend`);
+        console.log('📥 serverDebts:', serverDebts);
         
         for (const debt of serverDebts) {
             const exists = debts.some(d => d.id === debt.id);
             if (!exists) {
                 debts.push(debt);
+                console.log(`✅ เพิ่ม debt: ${debt.name} (${debt.id})`);
+            } else {
+                console.log(`⏭️ debt มีอยู่แล้ว: ${debt.name} (${debt.id})`);
             }
         }
         
-        saveDebtsToStorage();
+        console.log('📊 debts after load:', debts);
+        
+        if (saveToLocalEnabled) {
+            saveDebtsToStorage();
+            console.log('💾 บันทึก debts ลง localStorage');
+        } else {
+            console.log('⏭️ ข้ามการบันทึก localStorage (saveToLocalEnabled = false)');
+        }
+        
+        // ✅ เพิ่มบรรทัดนี้: รีเฟรชหน้า debt ถ้าอยู่ในหน้านั้น
+        if (getCurrentPage() === 'debt') {
+            renderDebtPage();
+        }
         
     } catch (error) {
         console.error('Error loading debts:', error);
@@ -14047,7 +15947,11 @@ async function saveDebtToBackend(debtData) {
             if (index !== -1) {
                 debts[index].id = result.id.toString();
                 debts[index].backendId = result.id;
-                saveDebtsToStorage();
+                
+                // ✅ แก้ไข: บันทึก local เฉพาะเมื่อ saveToLocalEnabled = true
+                if (saveToLocalEnabled) {
+                    saveDebtsToStorage();
+                }
             }
         }
         
@@ -14059,103 +15963,115 @@ async function saveDebtToBackend(debtData) {
 }
 
 async function updateDebtInBackend(debtData) {
-    if (!isLoggedIn || !navigator.onLine) return false;
+    if (!isLoggedIn || !navigator.onLine) {
+        console.log('⚠️ Cannot update debt: not logged in or offline');
+        return false;
+    }
     
+    // ถ้าเป็น temporary ID ให้บันทึกใหม่เลย
     if (debtData.id.toString().startsWith('debt_')) {
+        console.log('⚠️ Temporary ID detected, calling saveDebtToBackend instead');
         return saveDebtToBackend(debtData);
     }
     
     try {
+        // ✅ แปลง closedAt ให้เป็นแค่วันที่ (YYYY-MM-DD)
+        let closedAt = null;
+        if (debtData.closedAt) {
+            // ถ้ามีเวลา ให้ตัดทิ้ง
+            closedAt = debtData.closedAt.split('T')[0];
+            console.log('📅 Converted closedAt from', debtData.closedAt, 'to', closedAt);
+        }
+        
+        // ✅ แปลง startDate ให้เป็นแค่วันที่ (ถ้ามี)
+        let startDate = debtData.startDate;
+        if (startDate && startDate.includes('T')) {
+            startDate = startDate.split('T')[0];
+        }
+        
+        const requestBody = {
+            user_id: currentUser.id,
+            name: debtData.name,
+            categoryId: debtData.categoryId,
+            tag: debtData.tag || '',
+            totalAmount: debtData.totalAmount,
+            monthlyPayment: debtData.monthlyPayment,
+            interestRate: debtData.interestRate || 0,
+            dueDate: debtData.dueDate,
+            startDate: startDate,
+            status: debtData.status,
+            closedAt: closedAt  // ✅ ส่งเฉพาะวันที่ ไม่มีเวลา
+        };
+        
+        console.log('📤 Updating debt in backend:', {
+            id: debtData.id,
+            status: debtData.status,
+            closedAt: closedAt,
+            fullBody: requestBody
+        });
+        
         const response = await fetch(`${API_URL}/debts/${debtData.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                user_id: currentUser.id,
-                name: debtData.name,
-                categoryId: debtData.categoryId,
-                tag: debtData.tag,
-                totalAmount: debtData.totalAmount,
-                monthlyPayment: debtData.monthlyPayment,
-                interestRate: debtData.interestRate || 0,
-                dueDate: debtData.dueDate,
-                startDate: debtData.startDate,
-                status: debtData.status,
-                closedAt: debtData.closedAt
-            })
+            body: JSON.stringify(requestBody)
         });
         
-        return response.ok;
+        if (response.ok) {
+            const result = await response.json();
+            console.log('✅ Debt updated in backend successfully:', result);
+            return true;
+        } else {
+            const errorText = await response.text();
+            console.error('❌ Failed to update debt:', response.status, errorText);
+            return false;
+        }
     } catch (error) {
-        console.error('Error updating debt:', error);
+        console.error('❌ Error updating debt:', error);
         return false;
     }
 }
 
 async function deleteDebtFromBackend(debtId) {
-    if (!isLoggedIn || !navigator.onLine) return false;
+    if (!isLoggedIn || !navigator.onLine) {
+        console.log('⚠️ Cannot delete debt: not logged in or offline');
+        return false;
+    }
     
-    if (debtId.toString().startsWith('debt_')) return true;
+    if (debtId.toString().startsWith('debt_')) {
+        console.log('⚠️ Temporary ID, skipping backend deletion');
+        return true;
+    }
     
     try {
-        const response = await fetch(`${API_URL}/debts/${debtId}?user_id=${currentUser.id}`, {
+        const url = `${API_URL}/debts/${debtId}?user_id=${currentUser.id}`;
+        console.log('📡 DELETE debt request to:', url);
+        
+        const response = await fetch(url, {
             method: 'DELETE'
         });
         
-        return response.ok;
+        console.log('📡 Response status:', response.status);
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('✅ Debt deleted from backend:', result);
+            return true;
+        } else {
+            const errorText = await response.text();
+            console.error('❌ Failed to delete debt:', response.status, errorText);
+            
+            // ถ้า error เพราะ foreign key ให้แนะนำ
+            if (errorText.includes('foreign key constraint')) {
+                console.warn('⚠️ Cannot delete debt because it has related payments. Delete payments first.');
+            }
+            return false;
+        }
     } catch (error) {
-        console.error('Error deleting debt:', error);
+        console.error('❌ Error deleting debt:', error);
         return false;
     }
 }
 
-async function register() {
-    try {
-        const username = document.getElementById('reg-username')?.value;
-        const password = document.getElementById('reg-password')?.value;
-        const confirmPass = document.getElementById('reg-confirm-password')?.value;
-        
-        if (!username || !password || !confirmPass) {
-            showToast('⚠️ กรุณากรอกข้อมูลให้ครบ', 'error');
-            return;
-        }
-        
-        if (password !== confirmPass) {
-            showToast('⚠️ รหัสผ่านไม่ตรงกัน', 'error');
-            return;
-        }
-        
-        if (password.length < 6) {
-            showToast('⚠️ รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', 'error');
-            return;
-        }
-        
-        showToast('🔄 กำลังสมัครสมาชิก...', 'info');
-        
-        const response = await fetch(`${API_URL}/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: username.trim(), password: password.trim() })
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-            showToast('✅ สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบ', 'success');
-            
-            showLoginInModal();
-            
-            document.getElementById('reg-username').value = '';
-            document.getElementById('reg-password').value = '';
-            document.getElementById('reg-confirm-password').value = '';
-            
-        } else {
-            showToast('❌ ' + (data.error || 'ไม่สามารถสมัครสมาชิกได้'), 'error');
-        }
-    } catch (error) {
-        console.error('Register error:', error);
-        showToast('❌ เกิดข้อผิดพลาดในการเชื่อมต่อ', 'error');
-    }
-}
 
 
 async function logout() {
@@ -14182,6 +16098,14 @@ async function logout() {
             console.log(`🗑️ ลบข้อมูล user ${userId} จำนวน ${userTx.length} รายการ`);
         }
         
+        // ✅ ล้าง debts และ payments (ข้อมูลหนี้)
+        debts = [];
+        payments = [];
+        
+        // ✅ ล้าง localStorage ของ debts และ payments
+        localStorage.removeItem('fin_debts');
+        localStorage.removeItem('fin_debt_payments');
+        
         await loadInitialData();
         
         updateLocalSaveCheckbox();
@@ -14193,6 +16117,7 @@ async function logout() {
         
         updateUI();
     });
+    localStorage.removeItem('fin_cache_recent');
 }
 
 function closeAllModals() {
@@ -14329,6 +16254,61 @@ function showRegisterInModal() {
 function closeLoginModalOnBackdrop(event) {
     if (event.target === event.currentTarget) {
         hideLoginModal();
+    }
+}
+
+async function register() {
+    try {
+        const username = document.getElementById('reg-username')?.value;
+        const password = document.getElementById('reg-password')?.value;
+        const confirmPass = document.getElementById('reg-confirm-password')?.value;
+        
+        if (!username || !password || !confirmPass) {
+            showToast('⚠️ กรุณากรอกข้อมูลให้ครบ', 'error');
+            return;
+        }
+        
+        if (password !== confirmPass) {
+            showToast('⚠️ รหัสผ่านไม่ตรงกัน', 'error');
+            return;
+        }
+        
+        if (password.length < 6) {
+            showToast('⚠️ รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', 'error');
+            return;
+        }
+        
+        showToast('🔄 กำลังสมัครสมาชิก...', 'info');
+        
+        const response = await fetch(`${API_URL}/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                username: username.trim(), 
+                password: password.trim() 
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showToast('✅ สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบ', 'success');
+            
+            // เคลียร์ฟอร์ม
+            document.getElementById('reg-username').value = '';
+            document.getElementById('reg-password').value = '';
+            document.getElementById('reg-confirm-password').value = '';
+            
+            // เปลี่ยนไปหน้า login
+            showLoginInModal();
+            
+        } else {
+            showToast('❌ ' + (data.error || 'ไม่สามารถสมัครสมาชิกได้'), 'error');
+        }
+        
+    } catch (error) {
+        console.error('Register error:', error);
+        showToast('❌ เกิดข้อผิดพลาดในการเชื่อมต่อ', 'error');
     }
 }
 
