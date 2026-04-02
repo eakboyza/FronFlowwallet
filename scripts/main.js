@@ -119,7 +119,7 @@ const updateLogs = [
     }
     ,
                 {
-        date: "12 Mar 2026",
+        date: "3 Apr 2026",
         version: "1.0.7",
         title: "Update & Fixes",
         changes: [
