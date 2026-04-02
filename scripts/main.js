@@ -124,6 +124,7 @@ const updateLogs = [
         title: "Update & Fixes",
         changes: [
             "1.เพิ่มระบบ Login",
+            "2.ปรับปรุงประสิทธิภาพการทำงานในส่วนต่างๆ ให้ทำงานได้ดีขึ้น",
         ],
         icon: "📝"
     }
