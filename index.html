@@ -136,7 +136,7 @@
                 </div>
                 <span id="mobileUsername" class="text-xs bg-white/20 px-3 py-1 rounded-full"></span>
             </div>
-            <button onclick="logout()" 
+            <button onclick="logout();closeMobileSideMenu();" 
                     class="w-full bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg text-sm font-bold transition-colors">
                 ออกจากระบบ
             </button>
@@ -144,12 +144,39 @@
     </div>
 </div>
 
+
             <div class="px-4 mb-4">
                 <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">การบันทึกข้อมูล</p>
-                <button onclick="saveCurrentView(); closeMobileSideMenu(); switchPage('overview');" class="w-full px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl flex items-center gap-3">
+                
+
+                <div id="mobileLocalSaveOption" class="mb-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" 
+                               id="mobileSaveToLocalCheckbox" 
+                               class="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"
+                               checked>
+                        <div class="flex-1">
+                            <span class="text-sm font-bold dark:text-white">💾 บันทึกลงเครื่อง (Local + IndexedDB)</span>
+                            <p id="mobileLocalSaveHint" class="text-[10px] text-slate-400 mt-0.5">
+                                ข้อมูลจะถูกเก็บในเครื่องเพื่อใช้งานแบบออฟไลน์
+                            </p>
+                        </div>
+                    </label>
+                </div>
+
+
+                <button onclick="saveCurrentView(); closeMobileSideMenu(); switchPage('overview');" 
+                class="w-full px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl flex items-center gap-3">
                     <span class="text-xl">💾</span>
                     <span class="font-medium">บันทึกรายการ</span>
                     <span class="text-[10px] text-slate-400 ml-auto">Save to IndexedDB</span>
+                </button>
+
+                <button onclick="syncMySQLtoLocal(); closeMobileSideMenu();" 
+                        class="w-full px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl flex items-center gap-3">
+                    <span class="text-xl">🔄</span>
+                    <span class="font-medium">ซิงค์ข้อมูลจาก MySQL ลงเครื่อง</span>
+                    <span class="text-[10px] text-slate-400 ml-auto">ดึงข้อมูลทั้งหมด</span>
                 </button>
 
             </div>
@@ -219,33 +246,9 @@
         </button>
         
         <h3 class="text-lg font-bold text-slate-800 mb-6 dark:text-white flex items-center gap-2">⚙️ ตั้งค่าระบบ</h3>
+
+
         
-
-        <div id="mobileSettingsAuthContainer" class="mb-6">
-            <button id="mobileSettingsLoginBtn" onclick="showLoginModal(); closeMobileSettingsModal();" 
-                    class="w-full bg-indigo-600 text-white p-4 rounded-xl hover:bg-indigo-700 flex items-center justify-center gap-2 font-bold transition-all">
-                <span>🔐</span>
-                <span>เข้าสู่ระบบ</span>
-            </button>
-            
-            <div id="mobileSettingsLogoutBtn" class="hidden">
-                <div class="bg-gradient-to-r from-rose-500 to-rose-600 text-white p-4 rounded-xl">
-                    <div class="flex items-center justify-between mb-3">
-                        <div class="flex items-center gap-2">
-                            <span>🚪</span>
-                            <span class="font-bold">บัญชีของฉัน</span>
-                        </div>
-                        <span id="mobileSettingsUsername" class="text-xs bg-white/20 px-3 py-1 rounded-full"></span>
-                    </div>
-                    <button onclick="logout()" 
-                            class="w-full bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg text-sm font-bold transition-colors">
-                        ออกจากระบบ
-                    </button>
-                </div>
-            </div>
-        </div>
-
-
         <div class="space-y-4">
             <button onclick="openManageCatsModal(); closeMobileSettingsModal();" 
                     class="w-full flex items-center gap-3 p-4 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors dark:bg-slate-700/50 dark:hover:bg-slate-700">
@@ -366,7 +369,9 @@
                                         </div>
                                     </label>
                                 </div>
-                            <button id="submitBtn" onclick="saveTransaction()" class="w-full bg-slate-900 text-white py-3 rounded-xl font-bold text-sm shadow-lg hover:bg-slate-800 transition-all dark:bg-indigo-600">บันทึก</button>
+                            <button id="submitBtn" onclick="saveTransaction()" 
+                            class="w-full bg-slate-900 text-white py-3 rounded-xl font-bold text-sm shadow-lg hover:bg-slate-800 transition-all dark:bg-indigo-600">บันทึก
+                        </button>
                         </div>
                     </div>
                 </div>
@@ -1044,15 +1049,29 @@
                     </div>
                 </div>
                 <div class="space-y-3">
-    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">บันทึกการตั้งค่าปัจจุบัน</p>
-    <div onclick="saveCurrentView(); toggleSettingsModal();" class="flex items-center gap-3 p-3 bg-emerald-50 rounded-2xl cursor-pointer hover:bg-emerald-100 transition-colors dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 border border-emerald-100 dark:border-emerald-800">
-        <div class="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center dark:bg-emerald-900/50 dark:text-emerald-400 text-sm">💾</div>
-        <div>
-            <p class="font-bold text-[13px] dark:text-white">บันทึกรายการ</p>
-            <p class="text-[8px] text-slate-400 uppercase font-bold">Save to IndexedDB & localStorage</p>
-        </div>
-    </div>
-</div>
+                    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">บันทึกการตั้งค่าปัจจุบัน</p>
+                    <div onclick="saveCurrentView(); toggleSettingsModal();" class="flex items-center gap-3 p-3 bg-emerald-50 rounded-2xl cursor-pointer hover:bg-emerald-100 transition-colors dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 border border-emerald-100 dark:border-emerald-800">
+                        <div class="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center dark:bg-emerald-900/50 dark:text-emerald-400 text-sm">💾</div>
+                        <div>
+                            <p class="font-bold text-[13px] dark:text-white">บันทึกรายการ</p>
+                            <p class="text-[8px] text-slate-400 uppercase font-bold">Save to IndexedDB & localStorage</p>
+                        </div>
+                    </div>
+                        
+                        <div onclick="syncMySQLtoLocal()" 
+                        class="flex items-center gap-3 p-3 bg-indigo-50 rounded-2xl cursor-pointer hover:bg-indigo-100 transition-colors dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 border border-indigo-100 dark:border-indigo-800">
+                        <div class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center dark:bg-indigo-900/50 dark:text-indigo-400 text-sm">
+                            🔄
+                        </div>
+                        <div>
+                            <p class="font-bold text-[13px] dark:text-white">ซิงค์ข้อมูลจาก MySQL ลงเครื่อง</p>
+                            <p class="text-[8px] text-slate-400 uppercase font-bold">
+                                ดึงข้อมูลทั้งหมดจากเซิร์ฟเวอร์มาบันทึกในเครื่อง
+                            </p>
+                        </div>
+                    </div>
+
+                </div>
 <div onclick="toggleSettingsModal(); setTimeout(() => checkStorageStatus(), 100);" class="flex items-center gap-3 p-3 bg-blue-50 rounded-2xl cursor-pointer hover:bg-blue-100 transition-colors dark:bg-blue-900/30 dark:hover:bg-blue-900/50 border border-blue-100 dark:border-blue-800">
     <div class="w-8 h-8 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center dark:bg-blue-900/50 dark:text-blue-400 text-sm">📊</div>
     <div>
