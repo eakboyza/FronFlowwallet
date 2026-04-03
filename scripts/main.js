@@ -1,3 +1,21 @@
+// ============================================
+// UPDATE SERVICE WORKER ON STARTUP
+// ============================================
+
+(async function updateServiceWorker() {
+    if ('serviceWorker' in navigator) {
+        try {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            for (const registration of registrations) {
+                await registration.update();
+                console.log('✅ Service Worker updated to latest version');
+            }
+        } catch (error) {
+            console.log('⚠️ Service Worker update failed:', error);
+        }
+    }
+})();
+
 let syncQueue = JSON.parse(localStorage.getItem('syncQueue') || '[]');
 
 window.addEventListener('online', function() {
