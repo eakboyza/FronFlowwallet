@@ -1583,33 +1583,30 @@ async function loadInitialData() {
     
     try {
         if (isLoggedIn && navigator.onLine) {
-            // ✅ โหลดทุกอย่างพร้อมกัน และรอให้เสร็จทั้งหมด
+            // User mode: โหลดจาก backend
             await Promise.all([
                 loadAccountsFromBackend(),
                 loadCategoriesFromBackend(),
                 loadTransactionsFromBackend(),
                 loadDebtsFromBackend(),
-                loadPaymentsFromBackend()      // ✅ สำคัญ! ต้องมี
+                loadPaymentsFromBackend()
             ]);
-            
             transactions = backendTransactions;
         } else {
+            // Guest mode หรือ offline: โหลดจาก local
             const loadedTransactions = await financeDB.getAllTransactions();
+            const guestId = getGuestId();
             
-            if (isLoggedIn) {
-                transactions = loadedTransactions.filter(t => 
-                    t.owner_type === 'user' && t.owner_id === currentUser.id
-                );
-            } else {
-                const guestId = getGuestId();
-                transactions = loadedTransactions.filter(t => 
-                    t.owner_type === 'guest' && t.owner_id === guestId
-                );
-            }
+            // กรอง transactions
+            transactions = loadedTransactions.filter(t => 
+                t.owner_type === 'guest' && t.owner_id === guestId
+            );
             
-            // ✅ Guest mode: ล้างข้อมูลหนี้
-            debts = [];
-            payments = [];
+            // โหลด debts และ payments จาก localStorage
+            debts = loadDebtsFromLocalStorage();
+            payments = loadPaymentsFromLocalStorage();
+            
+            console.log(`📦 Guest mode: โหลด transactions ${transactions.length} รายการ, debts ${debts.length} รายการ, payments ${payments.length} รายการ`);
         }
         
         const loadedTargets = await financeDB.loadBudgetTargets();
@@ -1621,9 +1618,8 @@ async function loadInitialData() {
         
         console.log(`📊 Loaded ${transactions.length} transactions`);
         console.log(`📊 Loaded ${debts.length} debts`);
-        console.log(`📊 Loaded ${payments.length} payments`);  // ✅ เพิ่ม debug
+        console.log(`📊 Loaded ${payments.length} payments`);
         
-        // ✅ อัปเดต UI ครั้งเดียว หลังจากโหลดข้อมูลเสร็จ
         updateUI();
         renderCalendar();
         
@@ -1635,7 +1631,7 @@ async function loadInitialData() {
         } else if (currentPage === 'yearly') {
             updateYearlyUI();
         } else if (currentPage === 'debt') {
-            renderDebtPage();  // ✅ ตอนนี้ payments มีข้อมูลแล้ว
+            renderDebtPage();
         } else if (currentPage === 'accounts') {
             renderAccountsList();
         }
@@ -1647,8 +1643,95 @@ async function loadInitialData() {
     }
 }
 
+// เพิ่มฟังก์ชันนี้เพื่อโหลด debts จาก localStorage ใน Guest mode
+// โหลด debts จาก localStorage สำหรับ Guest mode
+function loadDebtsFromLocalStorage() {
+    if (!saveToLocalEnabled) {
+        console.log('⏭️ loadDebtsFromLocalStorage: saveToLocalEnabled = false');
+        return [];
+    }
+    
+    const guestId = getGuestId();
+    const storedDebts = JSON.parse(localStorage.getItem('fin_debts') || '[]');
+    
+    const guestDebts = storedDebts.filter(d => 
+        d.owner_type === 'guest' && d.owner_id === guestId
+    );
+    
+    console.log(`📦 loadDebtsFromLocalStorage: ${guestDebts.length} debts`);
+    return guestDebts;
+}
+
+
+
+// เพิ่มฟังก์ชันนี้เพื่อโหลด payments จาก localStorage ใน Guest mode
+function loadPaymentsFromLocalStorage() {
+    if (!saveToLocalEnabled) {
+        console.log('⏭️ loadPaymentsFromLocalStorage: saveToLocalEnabled = false');
+        return [];
+    }
+    
+    const guestId = getGuestId();
+    const storedPayments = JSON.parse(localStorage.getItem('fin_debt_payments') || '[]');
+    
+    const guestPayments = storedPayments.filter(p => 
+        p.owner_type === 'guest' && p.owner_id === guestId
+    );
+    
+    console.log(`💳 loadPaymentsFromLocalStorage: ${guestPayments.length} payments`);
+    return guestPayments;
+}
+
+function syncPaymentsToLocalStorage() {
+    if (!saveToLocalEnabled) {
+        console.log('⏭️ syncPaymentsToLocalStorage: Skipped (saveToLocalEnabled = false)');
+        return false;
+    }
+    
+    try {
+        let paymentsToSave = payments;
+        
+        if (!isLoggedIn) {
+            const guestId = getGuestId();
+            paymentsToSave = payments.filter(p => 
+                p.owner_type === 'guest' && p.owner_id === guestId
+            );
+            console.log(`👤 Guest mode: saving ${paymentsToSave.length} payments`);
+        } else if (currentUser?.id) {
+            paymentsToSave = payments.filter(p => 
+                p.owner_type === 'user' && p.owner_id === currentUser.id
+            );
+            console.log(`👤 User mode: saving ${paymentsToSave.length} payments`);
+        }
+        
+        localStorage.setItem('fin_debt_payments', JSON.stringify(paymentsToSave));
+        console.log(`💾 Payments saved to localStorage (${paymentsToSave.length} records)`);
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Failed to sync payments:', error);
+        return false;
+    }
+}
+
 async function loadPaymentsFromBackend() {
-    if (!isLoggedIn || !navigator.onLine) return [];
+    // ✅ ถ้าไม่ได้ login หรือไม่มี internet ให้ข้ามการโหลดจาก backend
+    if (!isLoggedIn || !navigator.onLine) {
+        console.log('⏭️ loadPaymentsFromBackend: Skipped (not logged in or offline)');
+        
+        // ✅ ถ้าเป็น Guest mode ให้โหลดจาก localStorage แทน
+        if (!isLoggedIn && saveToLocalEnabled) {
+            const guestId = getGuestId();
+            const storedPayments = JSON.parse(localStorage.getItem('fin_debt_payments') || '[]');
+            const guestPayments = storedPayments.filter(p => 
+                p.owner_type === 'guest' && p.owner_id === guestId
+            );
+            payments = guestPayments;
+            console.log(`💳 Guest mode: โหลด payments ${payments.length} รายการ จาก localStorage`);
+            return payments;
+        }
+        return [];
+    }
     
     try {
         const response = await fetch(`${API_URL}/debt-payments?user_id=${currentUser.id}`);
@@ -1662,8 +1745,7 @@ async function loadPaymentsFromBackend() {
         
         console.log(`📥 โหลด ${serverPayments.length} payments จาก backend`);
         
-        // ✅ เคลียร์ payments array ก่อน แล้วค่อยเพิ่มใหม่
-        payments.length = 0;  // เคลียร์ array โดยไม่สร้างใหม่
+        payments.length = 0;
         
         for (const payment of serverPayments) {
             payments.push({
@@ -1674,23 +1756,20 @@ async function loadPaymentsFromBackend() {
                 date: payment.payment_date,
                 note: payment.note || '',
                 backendId: payment.id,
-                createdAt: payment.created_at
+                createdAt: payment.created_at,
+                owner_type: 'user',
+                owner_id: currentUser.id
             });
-            console.log(`✅ เพิ่ม payment: ${payment.id} (${payment.amount} บาท)`);
         }
         
-        // บันทึก local ตาม checkbox
         if (saveToLocalEnabled) {
             savePaymentsToStorage();
-            console.log('💾 บันทึก payments ลง localStorage');
-        } else {
-            console.log('⏭️ ข้ามการบันทึก payments ลง localStorage (saveToLocalEnabled = false)');
         }
         
-        return payments;  // ✅ return ค่าด้วย
+        return payments;
         
     } catch (error) {
-        console.error('Error loading payments:', error);
+        console.error('Error loading payments from backend:', error);
         return [];
     }
 }
@@ -6380,11 +6459,74 @@ async function savePayment() {
     
     const debt = window.currentDebtForPayment;
     const shouldSaveToLocal = saveToLocalEnabled;
-    const paymentId = 'payment_' + Date.now();  // temporary ID
+    const paymentId = 'payment_' + Date.now();
     
     try {
-        // ✅ 4. บันทึก payment ก่อน (ได้ ID จริง)
-        console.log('📤 Step 1: Saving payment to backend...');
+        // ✅ 4. Guest mode: บันทึกเฉพาะ local เท่านั้น (ไม่เรียก backend)
+        if (!isLoggedIn) {
+            console.log('👤 Guest mode: Saving payment locally only');
+            
+            // สร้าง payment object
+            const newPayment = {
+                id: paymentId,
+                debtId: selectedDebtForPayment,
+                accountId: accountId,
+                amount: amount,
+                date: date,
+                note: note,
+                createdAt: new Date().toISOString(),
+                owner_type: 'guest',
+                owner_id: getGuestId()
+            };
+            
+            // เพิ่มลง payments array
+            payments.push(newPayment);
+            
+            // บันทึกลง localStorage
+            if (shouldSaveToLocal) {
+                syncPaymentsToLocalStorage();
+            }
+            
+            // สร้าง expense transaction
+            const now = new Date();
+            const expenseData = {
+                id: 'debt_expense_' + Date.now(),
+                amount: amount,
+                type: 'expense',
+                category: debt.categoryName,
+                icon: debt.categoryIcon,
+                desc: debt.name + ' (ผ่อนหนี้)',
+                tag: debt.tag || '#ผ่อนหนี้',
+                rawDate: date,
+                monthKey: getMonthKeyFromDate(date),
+                date: date,
+                accountId: accountId,
+                isDebtPayment: true,
+                originalDebtId: debt.id,
+                originalPaymentId: paymentId,
+                createdAt: now.toISOString(),
+                updatedAt: now.toISOString(),
+                owner_type: 'guest',
+                owner_id: getGuestId()
+            };
+            
+            // บันทึก transaction
+            await saveGuestTransaction(expenseData);
+            
+            // รีเฟรช UI
+            closePaymentModal();
+            renderDebtPage();
+            updateUI();
+            renderCalendar();
+            refreshAnalysisCharts();
+            
+            showToast(`✅ บันทึกการชำระหนี้สำเร็จ (฿${amount.toLocaleString()}) - Guest mode`);
+            return;
+        }
+        
+        // ✅ 5. User mode (Logged in): บันทึกที่ backend
+        console.log('👤 User mode: Saving payment to backend...');
+        
         const paymentResult = await saveDebtPaymentToBackend({
             id: paymentId,
             debtId: selectedDebtForPayment,
@@ -6402,7 +6544,7 @@ async function savePayment() {
         const realPaymentId = paymentResult.id;
         console.log(`✅ Payment saved with real ID: ${realPaymentId}`);
         
-        // ✅ 5. สร้าง transaction ด้วย realPaymentId
+        // สร้าง transaction
         const now = new Date();
         const expenseData = {
             id: 'debt_expense_' + Date.now(),
@@ -6421,11 +6563,9 @@ async function savePayment() {
             originalPaymentId: realPaymentId,
             createdAt: now.toISOString(),
             updatedAt: now.toISOString(),
-            owner_type: isLoggedIn ? 'user' : 'guest',
-            owner_id: isLoggedIn ? currentUser.id : getGuestId()
+            owner_type: 'user',
+            owner_id: currentUser.id
         };
-        
-        console.log('📤 Step 2: Creating transaction with real payment ID...');
         
         let transactionResult;
         if (isLoggedIn) {
@@ -6439,49 +6579,39 @@ async function savePayment() {
             throw new Error('บันทึก transaction ไม่สำเร็จ');
         }
         
-        // ✅ 6. อัปเดต payments array ใน memory
-        const existingPaymentIndex = payments.findIndex(p => p.id === paymentId);
-        if (existingPaymentIndex !== -1) {
-            payments[existingPaymentIndex] = {
-                ...payments[existingPaymentIndex],
-                id: realPaymentId,
-                backendId: realPaymentId
-            };
-        } else {
-            payments.push({
-                id: realPaymentId,
-                debtId: selectedDebtForPayment,
-                accountId: accountId,
-                amount: amount,
-                date: date,
-                note: note,
-                backendId: realPaymentId,
-                createdAt: now.toISOString()
-            });
-        }
+        // อัปเดต payments array
+        payments.push({
+            id: realPaymentId,
+            debtId: selectedDebtForPayment,
+            accountId: accountId,
+            amount: amount,
+            date: date,
+            note: note,
+            backendId: realPaymentId,
+            createdAt: now.toISOString(),
+            owner_type: 'user',
+            owner_id: currentUser.id
+        });
         
-        // ✅ 7. บันทึก local storage (ถ้าเปิดใช้งาน)
         if (shouldSaveToLocal) {
             savePaymentsToStorage();
         }
         
-        // ✅ 8. โหลดข้อมูลทั้งหมดจาก backend ใหม่ (สำคัญที่สุด!)
+        // โหลดข้อมูลใหม่จาก backend
         console.log('🔄 Reloading all data from backend...');
         await Promise.all([
-            loadTransactionsFromBackend(),  // ✅ โหลด transaction ใหม่
-            loadDebtsFromBackend(),          // ✅ โหลด debts ใหม่ (เผื่อยอดเปลี่ยน)
-            loadPaymentsFromBackend()        // ✅ โหลด payments ใหม่
+            loadTransactionsFromBackend(),
+            loadDebtsFromBackend(),
+            loadPaymentsFromBackend()
         ]);
         
-        // ✅ 9. อัปเดต transactions array
         transactions = backendTransactions;
         
-        // ✅ 10. รีเฟรช UI ทั้งหมด
         closePaymentModal();
         renderDebtPage();
-        updateUI();           // ✅ อัปเดตหน้า overview
-        renderCalendar();     // ✅ อัปเดตปฏิทิน
-        refreshAnalysisCharts(); // ✅ อัปเดตกราฟ
+        updateUI();
+        renderCalendar();
+        refreshAnalysisCharts();
         
         showToast(`✅ บันทึกการชำระหนี้สำเร็จ (฿${amount.toLocaleString()})`);
         
@@ -7217,21 +7347,31 @@ function renderPaymentHistory() {
 let editingDebtId = null;
 let selectedDebtForPayment = null;
 
+
+
 function openAddDebtModal() {
     editingDebtId = null;
     document.getElementById('debtModalTitle').textContent = 'เพิ่มหนี้ใหม่';
     document.getElementById('saveDebtBtn').textContent = 'บันทึก';
     
+    // ✅ โหลดหมวดหมู่ลง select
     const categorySelect = document.getElementById('debtCategorySelect');
     if (categorySelect) {
-        categorySelect.innerHTML = `
-            <option value="">-- เลือกหมวดหมู่ --</option>
-            ${customCategories.spending.map(cat => `
-                <option value="${cat.id}">${cat.icon} ${cat.label}</option>
-            `).join('')}
-        `;
+        let optionsHTML = '<option value="">-- เลือกหมวดหมู่ --</option>';
+        
+        customCategories.spending.forEach(cat => {
+            optionsHTML += `
+                <option value="${cat.id}">
+                    ${cat.icon} ${cat.label}
+                </option>
+            `;
+        });
+        
+        categorySelect.innerHTML = optionsHTML;
+        console.log(`✅ โหลดหมวดหมู่ลง select แล้ว (${customCategories.spending.length} หมวด)`);
     }
     
+    // เคลียร์ฟอร์ม
     document.getElementById('debtNameInput').value = '';
     document.getElementById('debtTagInput').value = 'ผ่อนหนี้';
     document.getElementById('debtTotalAmount').value = '';
@@ -7255,8 +7395,27 @@ function openEditDebtModal(debtId) {
     document.getElementById('debtModalTitle').textContent = 'แก้ไขหนี้';
     document.getElementById('saveDebtBtn').textContent = 'อัปเดต';
     
+    // ✅ สำคัญ: โหลดหมวดหมู่ลงใน select ก่อน
+    const categorySelect = document.getElementById('debtCategorySelect');
+    if (categorySelect) {
+        // สร้าง options จาก customCategories.spending
+        let optionsHTML = '<option value="">-- เลือกหมวดหมู่ --</option>';
+        
+        customCategories.spending.forEach(cat => {
+            const selected = (cat.id === debt.categoryId) ? 'selected' : '';
+            optionsHTML += `
+                <option value="${cat.id}" ${selected}>
+                    ${cat.icon} ${cat.label}
+                </option>
+            `;
+        });
+        
+        categorySelect.innerHTML = optionsHTML;
+        console.log(`✅ โหลดหมวดหมู่ลง select แล้ว, เลือกหมวด ${debt.categoryId}`);
+    }
+    
+    // กรอกข้อมูลอื่นๆ
     document.getElementById('debtNameInput').value = debt.name;
-    document.getElementById('debtCategorySelect').value = debt.categoryId;
     document.getElementById('debtTagInput').value = debt.tag || '#ผ่อนหนี้';
     document.getElementById('debtTotalAmount').value = debt.totalAmount;
     document.getElementById('debtMonthlyPayment').value = debt.monthlyPayment;
@@ -7308,11 +7467,13 @@ async function saveDebt() {
         interestRate,
         dueDate,
         startDate,
-        status: 'open', 
-        closedAt: null,  
-        closingNote: '', 
+        status: 'open',
+        closedAt: null,
+        closingNote: '',
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        owner_type: isLoggedIn ? 'user' : 'guest',
+        owner_id: isLoggedIn ? currentUser.id : getGuestId()
     };
     
     if (editingDebtId) {
@@ -7492,7 +7653,10 @@ async function updatePayment() {
         amount: amount,
         date: date,
         note: note,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        // ✅ เพิ่มตรงนี้ (รักษาค่าเดิม)
+        owner_type: payment.owner_type || (isLoggedIn ? 'user' : 'guest'),
+        owner_id: payment.owner_id || (isLoggedIn ? currentUser.id : getGuestId())
     };
     
     // ✅ 2. บันทึก payment ไป MySQL
@@ -7602,7 +7766,10 @@ function resetPaymentModal() {
 
 function deletePayment(paymentId) {
     const payment = payments.find(p => p.id === paymentId);
-    if (!payment) return;
+    if (!payment) {
+        showToast('❌ ไม่พบรายการชำระหนี้');
+        return;
+    }
     
     const debt = debts.find(d => d.id === payment.debtId);
     const debtName = debt ? debt.name : 'หนี้';
@@ -7612,49 +7779,69 @@ function deletePayment(paymentId) {
         `ลบการชำระ ${payment.amount.toLocaleString()} บาท ของ "${debtName}"\n` +
         '⚠️ รายการในหน้าหลักจะถูกลบด้วย',
         async () => {
-            // ✅ 1. ค้นหา transaction ที่เกี่ยวข้อง
-            const expense = transactions.find(t => 
-                t.originalPaymentId === paymentId || 
-                t.originalPaymentId === paymentId.toString()
-            );
-            
-            // ✅ 2. ลบ transaction (จะลบ payment record ด้วย)
-            if (expense) {
-                console.log(`🗑️ Deleting related transaction: ${expense.id}`);
-                if (isLoggedIn) {
-                    await deleteTransaction(expense.id, true);
-                } else {
+            try {
+                // ✅ 1. ค้นหา transaction ที่เกี่ยวข้อง
+                const expense = transactions.find(t => 
+                    t.originalPaymentId === paymentId || 
+                    t.originalPaymentId === paymentId.toString()
+                );
+                
+                // ✅ 2. ลบ transaction ก่อน
+                if (expense) {
+                    console.log(`🗑️ Deleting related transaction: ${expense.id}`);
+                    
+                    if (isLoggedIn) {
+                        // User mode: ลบจาก backend
+                        await deleteTransactionFromBackend(expense.id);
+                    }
+                    
+                    // ลบจาก IndexedDB และ localStorage
                     await financeDB.deleteTransaction(expense.id);
-                }
-            } else {
-                // ถ้าไม่พบ transaction ให้ลบ payment อย่างเดียว
-                if (isLoggedIn && navigator.onLine) {
-                    await deleteDebtPaymentFromBackend(paymentId);
+                    
+                    // ลบจาก transactions array
+                    const txIndex = transactions.findIndex(t => t.id === expense.id);
+                    if (txIndex !== -1) {
+                        transactions.splice(txIndex, 1);
+                    }
+                    
+                    console.log('✅ Transaction deleted successfully');
                 }
                 
-                payments = payments.filter(p => p.id !== paymentId);
+                // ✅ 3. ลบ payment จาก payments array
+                const paymentIndex = payments.findIndex(p => p.id === paymentId);
+                if (paymentIndex !== -1) {
+                    payments.splice(paymentIndex, 1);
+                    console.log(`✅ Payment removed from payments array, remaining: ${payments.length}`);
+                }
                 
+                // ✅ 4. ลบ payment จาก backend (ถ้าเป็น user mode และมี backendId)
+                if (isLoggedIn && navigator.onLine && payment.backendId) {
+                    await deleteDebtPaymentFromBackend(payment.backendId);
+                    console.log('✅ Payment deleted from backend');
+                }
+                
+                // ✅ 5. บันทึก localStorage (สำคัญที่สุด!)
                 if (saveToLocalEnabled) {
-                    savePaymentsToStorage();
+                    // ใช้ syncPaymentsToLocalStorage แทน savePaymentsToStorage
+                    // เพื่อให้แน่ใจว่า guest mode filter ถูกต้อง
+                    syncPaymentsToLocalStorage();
+                    console.log('💾 Payments saved to localStorage after deletion');
                 }
+                
+                // ✅ 6. รีเฟรช UI
+                renderDebtPage();
+                updateUI();
+                renderCalendar();
+                refreshAnalysisCharts();
+                
+                showToast('✅ ลบรายการชำระสำเร็จ');
+                hideConfirm();
+                
+            } catch (error) {
+                console.error('❌ Error in deletePayment:', error);
+                showToast(`❌ ลบไม่สำเร็จ: ${error.message}`);
+                hideConfirm();
             }
-            
-            // ✅ 3. โหลดข้อมูลใหม่
-            if (isLoggedIn && navigator.onLine) {
-                await Promise.all([
-                    loadTransactionsFromBackend(),
-                    loadPaymentsFromBackend()
-                ]);
-                transactions = backendTransactions;
-            }
-            
-            renderDebtPage();
-            updateUI();
-            renderCalendar();
-            refreshAnalysisCharts();
-            
-            showToast('✅ ลบรายการชำระสำเร็จ');
-            hideConfirm();
         }
     );
 }
@@ -7850,28 +8037,44 @@ function reopenDebt(debtId) {
 }
 
 function saveDebtsToStorage() {
-    console.log('💾 saveDebtsToStorage called, saveToLocalEnabled =', saveToLocalEnabled);
-    console.trace();
-    if (saveToLocalEnabled) {
-        localStorage.setItem('fin_debts', JSON.stringify(debts));
-    } else {
-        console.warn('⚠️ ข้ามการบันทึก localStorage เพราะ saveToLocalEnabled = false');
-    }
-}
-
-function savePaymentsToStorage() {
-    // ✅ เพิ่มการตรวจสอบ
+    console.log('💾 saveDebtsToStorage called');
+    console.log('   saveToLocalEnabled =', saveToLocalEnabled);
+    console.log('   isLoggedIn =', isLoggedIn);
+    console.log('   debts.length =', debts.length);
+    
     if (!saveToLocalEnabled) {
-        console.log('⏭️ savePaymentsToStorage: Skipped (saveToLocalEnabled = false)');
+        console.log('⏭️ ข้ามการบันทึก localStorage เพราะ saveToLocalEnabled = false');
         return;
     }
     
-    try {
-        localStorage.setItem('fin_debt_payments', JSON.stringify(payments));
-        console.log('💾 Payments saved to localStorage');
-    } catch (error) {
-        console.error('Failed to save payments:', error);
+    // ✅ กรองเฉพาะ debts ที่ควรเก็บใน localStorage
+    let debtsToSave = debts;
+    
+    if (!isLoggedIn) {
+        // Guest mode: เก็บเฉพาะ debts ของ guest นี้
+        const guestId = getGuestId();
+        debtsToSave = debts.filter(d => 
+            d.owner_type === 'guest' && d.owner_id === guestId
+        );
+        console.log(`👤 Guest mode: saving ${debtsToSave.length} debts (filtered from ${debts.length})`);
+        console.log('   Guest ID:', guestId);
+        console.log('   Sample debt owner_id:', debtsToSave[0]?.owner_id);
+    } else {
+        // User mode: เก็บเฉพาะ debts ที่เป็นของ user นี้
+        debtsToSave = debts.filter(d => 
+            d.owner_type === 'user' && d.owner_id === currentUser?.id
+        );
     }
+    
+    localStorage.setItem('fin_debts', JSON.stringify(debtsToSave));
+    console.log('💾 บันทึก debts ลง localStorage แล้ว');
+
+    const verify = JSON.parse(localStorage.getItem('fin_debts') || '[]');
+    console.log(`   Verified: ${verify.length} debts in localStorage`);
+}
+
+function savePaymentsToStorage() {
+    return syncPaymentsToLocalStorage();
 }
 
 function switchPieChartTab(tab) {
@@ -10184,7 +10387,9 @@ async function handleDebtPayment(transactionData) {
                 amount: transactionData.amount,
                 date: transactionData.rawDate,
                 note: transactionData.desc,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                owner_type: isLoggedIn ? 'user' : 'guest',
+                owner_id: isLoggedIn ? currentUser.id : getGuestId()
             };
             console.log('📦 New payment object:', newPayment);
             
@@ -10364,6 +10569,8 @@ function getGuestId() {
         guestId = 'guest_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         localStorage.setItem('guest_id', guestId);
         console.log('🆕 สร้าง Guest ID ใหม่:', guestId);
+    } else {
+        console.log('🔑 ใช้ Guest ID เดิม:', guestId);
     }
     return guestId;
 }
@@ -15897,43 +16104,59 @@ async function loadBudgetsFromBackend() {
 
 
 async function loadDebtsFromBackend() {
+    // ✅ ถ้าไม่ได้ login หรือไม่มี internet ให้ข้ามการโหลดจาก backend
+    if (!isLoggedIn || !navigator.onLine) {
+        console.log('⏭️ loadDebtsFromBackend: Skipped (not logged in or offline)');
+        
+        // ✅ ถ้าเป็น Guest mode ให้โหลดจาก localStorage แทน
+        if (!isLoggedIn && saveToLocalEnabled) {
+            const guestId = getGuestId();
+            const storedDebts = JSON.parse(localStorage.getItem('fin_debts') || '[]');
+            const guestDebts = storedDebts.filter(d => 
+                d.owner_type === 'guest' && d.owner_id === guestId
+            );
+            debts = guestDebts;
+            console.log(`📦 Guest mode: โหลด debts ${debts.length} รายการ จาก localStorage`);
+            return debts;
+        }
+        return [];
+    }
+    
     console.log('🚀 loadDebtsFromBackend START, currentUser.id =', currentUser?.id);
-    console.log('🚀 loadDebtsFromBackend START, saveToLocalEnabled =', saveToLocalEnabled);
     
     try {
         const response = await fetch(`${API_URL}/debts/${currentUser.id}`);
+        
+        if (!response.ok) {
+            console.warn('Failed to load debts from backend, status:', response.status);
+            return [];
+        }
+        
         const serverDebts = await response.json();
         
         console.log(`📥 โหลด ${serverDebts.length} debts จาก backend`);
-        console.log('📥 serverDebts:', serverDebts);
+        
+        // เคลียร์ debts array ก่อนโหลดใหม่
+        debts.length = 0;
         
         for (const debt of serverDebts) {
-            const exists = debts.some(d => d.id === debt.id);
-            if (!exists) {
-                debts.push(debt);
-                console.log(`✅ เพิ่ม debt: ${debt.name} (${debt.id})`);
-            } else {
-                console.log(`⏭️ debt มีอยู่แล้ว: ${debt.name} (${debt.id})`);
-            }
+            const debtWithOwner = {
+                ...debt,
+                owner_type: 'user',
+                owner_id: currentUser.id
+            };
+            debts.push(debtWithOwner);
         }
-        
-        console.log('📊 debts after load:', debts);
         
         if (saveToLocalEnabled) {
             saveDebtsToStorage();
-            console.log('💾 บันทึก debts ลง localStorage');
-        } else {
-            console.log('⏭️ ข้ามการบันทึก localStorage (saveToLocalEnabled = false)');
         }
         
-        // ✅ เพิ่มบรรทัดนี้: รีเฟรชหน้า debt ถ้าอยู่ในหน้านั้น
-        if (getCurrentPage() === 'debt') {
-            renderDebtPage();
-        }
+        return debts;
         
     } catch (error) {
-        console.error('Error loading debts:', error);
-        throw error;
+        console.error('Error loading debts from backend:', error);
+        return [];
     }
 }
 
@@ -16377,3 +16600,226 @@ window.debugIndexedDB = async function() {
     
     return 'ตรวจสอบเสร็จ';
 };
+
+
+// ============================================
+// CONVERT GUEST DATA TO USER DATA
+// ============================================
+
+async function convertGuestDataToUser() {
+    if (!isLoggedIn) {
+        showToast('⚠️ กรุณาเข้าสู่ระบบก่อน', 'error');
+        return false;
+    }
+    
+    if (!navigator.onLine) {
+        showToast('⚠️ ต้องออนไลน์เพื่อแปลงข้อมูล', 'error');
+        return false;
+    }
+    
+    showConfirm(
+        'แปลงข้อมูลจาก Guest สู่ User?',
+        `⚠️ คำเตือน:\n\n` +
+        `• ข้อมูล Guest (${getGuestId()}) จะถูกย้ายไปยัง User (${currentUser.username})\n` +
+        `• ข้อมูลเดิมของ User อาจถูกเขียนทับ (กรณี ID ซ้ำ)\n` +
+        `• ไม่สามารถยกเลิกได้\n\n` +
+        `ยืนยันที่จะดำเนินการ?`,
+        async () => {
+            try {
+                showToast('🔄 กำลังแปลงข้อมูล...', 'info');
+                
+                // 1. ดึงข้อมูล Guest จาก localStorage
+                const guestId = getGuestId();
+                const guestData = {
+                    transactions: [],
+                    debts: [],
+                    payments: [],
+                    accounts: [],
+                    categories: [],
+                    budgets: []
+                };
+                
+                // ดึง transactions จาก IndexedDB
+                const allTransactions = await financeDB.getAllTransactions();
+                guestData.transactions = allTransactions.filter(t => 
+                    t.owner_type === 'guest' && t.owner_id === guestId
+                );
+                
+                // ดึง debts จาก localStorage
+                const storedDebts = JSON.parse(localStorage.getItem('fin_debts') || '[]');
+                guestData.debts = storedDebts.filter(d => 
+                    d.owner_type === 'guest' && d.owner_id === guestId
+                );
+                
+                // ดึง payments จาก localStorage
+                const storedPayments = JSON.parse(localStorage.getItem('fin_debt_payments') || '[]');
+                guestData.payments = storedPayments.filter(p => 
+                    p.owner_type === 'guest' && p.owner_id === guestId
+                );
+                
+                // ดึง accounts (ปกติ accounts จะเป็นของ user อยู่แล้ว)
+                const storedAccounts = JSON.parse(localStorage.getItem('fin_accounts') || '[]');
+                guestData.accounts = storedAccounts.filter(a => 
+                    a.owner_type === 'guest' && a.owner_id === guestId
+                );
+                
+                // ดึง categories
+                const storedCategories = JSON.parse(localStorage.getItem('fin_custom_cats') || '{}');
+                // categories เป็น object พิเศษ ต้องแปลงให้มี owner fields
+                
+                console.log(`📊 พบข้อมูล Guest:`, {
+                    transactions: guestData.transactions.length,
+                    debts: guestData.debts.length,
+                    payments: guestData.payments.length,
+                    accounts: guestData.accounts.length
+                });
+                
+                if (guestData.transactions.length === 0 && guestData.debts.length === 0) {
+                    showToast('ℹ️ ไม่พบข้อมูล Guest ที่ต้องการแปลง', 'info');
+                    hideConfirm();
+                    return;
+                }
+                
+                // 2. แปลง owner fields
+                const convertedData = {
+                    transactions: guestData.transactions.map(t => ({
+                        ...t,
+                        owner_type: 'user',
+                        owner_id: currentUser.id,
+                        id: t.id.toString(), // รักษา ID เดิม
+                        updatedAt: new Date().toISOString()
+                    })),
+                    debts: guestData.debts.map(d => ({
+                        ...d,
+                        owner_type: 'user',
+                        owner_id: currentUser.id,
+                        updatedAt: new Date().toISOString()
+                    })),
+                    payments: guestData.payments.map(p => ({
+                        ...p,
+                        owner_type: 'user',
+                        owner_id: currentUser.id,
+                        updatedAt: new Date().toISOString()
+                    })),
+                    accounts: guestData.accounts.map(a => ({
+                        ...a,
+                        owner_type: 'user',
+                        owner_id: currentUser.id,
+                        updatedAt: new Date().toISOString()
+                    }))
+                };
+                
+                console.log(`🔄 แปลงข้อมูลเสร็จ:`, {
+                    transactions: convertedData.transactions.length,
+                    debts: convertedData.debts.length,
+                    payments: convertedData.payments.length
+                });
+                
+                // 3. บันทึกไปที่ backend (MySQL)
+                showToast('📤 กำลังบันทึกไปยังเซิร์ฟเวอร์...', 'info');
+                
+                let successCount = 0;
+                let errorCount = 0;
+                
+                // บันทึก transactions
+                for (const tx of convertedData.transactions) {
+                    try {
+                        // ตรวจสอบว่ามี transaction นี้ใน backend หรือยัง
+                        const checkResponse = await fetch(`${API_URL}/transactions/${currentUser.id}?month=${tx.monthKey}`);
+                        const existing = await checkResponse.json();
+                        
+                        const exists = existing.some(e => e.id === tx.id || e.originalPaymentId === tx.originalPaymentId);
+                        
+                        if (!exists) {
+                            const result = await saveTransactionToBackend(tx);
+                            if (result && result.success) {
+                                successCount++;
+                            } else {
+                                errorCount++;
+                            }
+                        } else {
+                            console.log(`⏭️ ข้าม transaction ซ้ำ: ${tx.id}`);
+                        }
+                    } catch (txError) {
+                        console.error(`❌ Error saving transaction ${tx.id}:`, txError);
+                        errorCount++;
+                    }
+                }
+                
+                // บันทึก debts
+                for (const debt of convertedData.debts) {
+                    try {
+                        const exists = await checkDebtExists(debt.id);
+                        if (!exists) {
+                            await saveDebtToBackend(debt);
+                            successCount++;
+                        }
+                    } catch (debtError) {
+                        console.error(`❌ Error saving debt ${debt.id}:`, debtError);
+                        errorCount++;
+                    }
+                }
+                
+                // บันทึก payments
+                for (const payment of convertedData.payments) {
+                    try {
+                        const exists = await checkPaymentExists(payment.id);
+                        if (!exists) {
+                            await saveDebtPaymentToBackend(payment);
+                            successCount++;
+                        }
+                    } catch (paymentError) {
+                        console.error(`❌ Error saving payment ${payment.id}:`, paymentError);
+                        errorCount++;
+                    }
+                }
+                
+                // 4. รีเฟรชข้อมูล
+                showToast('🔄 โหลดข้อมูลใหม่...', 'info');
+                await Promise.all([
+                    loadTransactionsFromBackend(),
+                    loadDebtsFromBackend(),
+                    loadPaymentsFromBackend()
+                ]);
+                
+                transactions = backendTransactions;
+                
+                // 5. อัปเดต UI
+                updateUI();
+                renderCalendar();
+                renderDebtPage();
+                refreshAnalysisCharts();
+                
+                showToast(`✅ แปลงข้อมูลสำเร็จ! (สำเร็จ: ${successCount}, ผิดพลาด: ${errorCount})`, 'success');
+                hideConfirm();
+                
+            } catch (error) {
+                console.error('❌ Error converting data:', error);
+                showToast(`❌ แปลงข้อมูลไม่สำเร็จ: ${error.message}`, 'error');
+                hideConfirm();
+            }
+        }
+    );
+}
+
+// ฟังก์ชันช่วยตรวจสอบ debt ซ้ำ
+async function checkDebtExists(debtId) {
+    try {
+        const response = await fetch(`${API_URL}/debts/${currentUser.id}`);
+        const debts = await response.json();
+        return debts.some(d => d.id == debtId || d.name === debtId);
+    } catch (error) {
+        return false;
+    }
+}
+
+// ฟังก์ชันช่วยตรวจสอบ payment ซ้ำ
+async function checkPaymentExists(paymentId) {
+    try {
+        const response = await fetch(`${API_URL}/debt-payments?user_id=${currentUser.id}`);
+        const payments = await response.json();
+        return payments.some(p => p.id == paymentId);
+    } catch (error) {
+        return false;
+    }
+}
