@@ -67,6 +67,18 @@ async function processSyncQueue() {
                 await updateTransactionInBackend(item.data);
             } else if (item.action === 'delete') {
                 await deleteTransactionFromBackend(item.data.id);
+            } else if (item.action === 'create_category') {
+                await saveCategoryToBackend(item.data.data);
+            } else if (item.action === 'update_category') {
+                await saveCategoryToBackend(item.data.data);
+            } else if (item.action === 'delete_category') {
+                await deleteCategoryFromBackend(item.data.categoryId);
+            } else if (item.action === 'create_tag') {
+                await saveTagToBackend(item.data);
+            } else if (item.action === 'update_tag') {
+                await updateTagInBackend(item.data.tagId, item.data.newName);
+            } else if (item.action === 'delete_tag') {
+                await deleteTagFromBackend(item.data.tagId);
             }
             success++;
         } catch (error) {
@@ -94,16 +106,7 @@ const defaultCategories = {
 };
 
 const updateLogs = [
-        {
-        date: "2 Mar 2026",
-        version: "1.0.3",
-        title: "Update & Fixes",
-        changes: [
-            "1.แก้ไขในส่วน javascript ในเรื่อง ขนาด Font ในช่อง Calendargrid เกินเปลี่ยนจากแสดงตัวเลขเป็น จุด เพื่อให้แสดงผลได้ดีขึ้นใน Mobile",
-            "2.แก้บัคเกี่ยวกับปัญหา ไม่แสดงประวัติรายการ ในเดือนก่อนหน้า เมื่อกดดูประวัติในเดือนนั้นๆ ใน Mobile&Desktop",
-        ],
-        icon: "📝"
-    },
+   
             {
         date: "3 Mar 2026",
         version: "1.0.4",
@@ -146,7 +149,17 @@ const updateLogs = [
         ],
         icon: "📝"
     }
-
+    ,
+                {
+        date: "8 Apr 2026",
+        version: "1.0.8",
+        title: "Update & Fixes",
+        changes: [
+            "1.เพิ่มระบบ User ให้ทำงานได้ดีขึ้น",
+            "2.ปรับปรุงประสิทธิภาพการทำงานในส่วนต่างๆ ให้ทำงานได้ดีขึ้น",
+        ],
+        icon: "📝"
+    }
 ];
 
 
@@ -224,10 +237,10 @@ const transferTypes = {
         let transactions = JSON.parse(localStorage.getItem('fin_tx_v5')) || [];
         let categoryTargets = JSON.parse(localStorage.getItem('fin_targets_v5')) || {};
 
-const defaultAccounts = [
-    {
-        id: 'default_acc', 
-        name: 'บัญชีหลัก',
+const defaultAccountsTemplate = [
+{
+        id: `acc_${Date.now()}_0_${Math.random().toString(36).substr(2, 9)}`,
+        name: 'บัญชีหลักLocal',
         type: 'savings',
         color: '#6366f1',
         icon: '🏦',
@@ -237,8 +250,8 @@ const defaultAccounts = [
         updatedAt: new Date().toISOString()
     },
     {
-        id: 'cash_acc',  
-        name: 'เงินสด',
+        id: `acc_${Date.now()}_0_${Math.random().toString(36).substr(2, 9)}`,
+        name: 'เงินสดLocal',
         type: 'cash',
         color: '#10b981',
         icon: '💰',
@@ -249,7 +262,150 @@ const defaultAccounts = [
     }
 ];
 
-let accounts = JSON.parse(localStorage.getItem('fin_accounts')) || defaultAccounts;
+function initializeDefaultAccounts() {
+    // ✅ ถ้าเป็น login mode ให้ข้ามการสร้าง default accounts ทันที
+    if (isLoggedIn) {
+        console.log('⏭️ Skip initializeDefaultAccounts (User mode)');
+        return;
+    }
+    
+    const existingAccounts = JSON.parse(localStorage.getItem('fin_accounts') || '[]');
+    
+    // ✅ Guest mode เท่านั้นที่ทำงาน
+    const guestId = getGuestId();
+    const myAccounts = existingAccounts.filter(a => 
+        a.owner_type === 'guest' && a.owner_id === guestId
+    );
+    
+    if (myAccounts.length === 0) {
+        console.log('🏦 Guest mode: ไม่พบบัญชี, กำลังสร้างบัญชีเริ่มต้น...');
+        
+        const newAccounts = defaultAccountsTemplate.map((acc, index) => ({
+            ...acc,
+            id: `acc_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            owner_type: 'guest',
+            owner_id: guestId
+        }));
+        
+        accounts = [...existingAccounts, ...newAccounts];
+        localStorage.setItem('fin_accounts', JSON.stringify(accounts));
+        
+        const defaultAcc = newAccounts.find(a => a.isDefault);
+        if (defaultAcc) {
+            currentAccountId = defaultAcc.id;
+            localStorage.setItem('fin_current_account', currentAccountId);
+        }
+        
+        console.log('✅ สร้างบัญชีเริ่มต้นสำหรับ Guest สำเร็จ:', newAccounts.length, 'บัญชี');
+    } else {
+        accounts = existingAccounts;
+        console.log('✅ Guest mode: มีบัญชีอยู่แล้ว:', myAccounts.length, 'บัญชี');
+    }
+}
+
+async function migrateLegacyAccounts() {
+    if (!isLoggedIn || !navigator.onLine) return false;
+    
+    // ตรวจสอบว่ามี legacy accounts (id = default_acc, cash_acc) หรือไม่
+    const hasLegacyAccounts = accounts.some(a => 
+        a.id === 'default_acc' || a.id === 'cash_acc'
+    );
+    
+    if (!hasLegacyAccounts) return false;
+    
+    console.log('🔄 พบ legacy accounts (default_acc/cash_acc), กำลังแปลง...');
+    showToast('🔄 กำลังแปลงบัญชีเก่า...', 'info');
+    
+    let migratedCount = 0;
+    
+    for (const account of accounts) {
+        if (account.id === 'default_acc' || account.id === 'cash_acc') {
+            try {
+                // ลบ id เดิม ให้ backend สร้างใหม่
+                const newAccount = {
+                    name: account.name,
+                    type: account.type,
+                    icon: account.icon,
+                    initialBalance: account.initialBalance || 0,
+                    isDefault: account.isDefault
+                };
+                
+                const response = await fetch(`${API_URL}/accounts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: currentUser.id,
+                        ...newAccount
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    const oldId = account.id;
+                    const newId = result.id.toString();
+                    
+                    // อัปเดต id ใน account
+                    account.id = newId;
+                    account.backendId = result.id;
+                    account.updatedAt = new Date().toISOString();
+                    
+                    // อัปเดต transactions ที่ใช้ account นี้
+                    for (const tx of transactions) {
+                        if (tx.accountId === oldId) {
+                            tx.accountId = newId;
+                            await financeDB.saveTransaction(tx);
+                        }
+                        if (tx.transferToAccountId === oldId) {
+                            tx.transferToAccountId = newId;
+                            await financeDB.saveTransaction(tx);
+                        }
+                        if (tx.transferFromAccountId === oldId) {
+                            tx.transferFromAccountId = newId;
+                            await financeDB.saveTransaction(tx);
+                        }
+                    }
+                    
+                    // อัปเดต payments ที่ใช้ account นี้
+                    for (const payment of payments) {
+                        if (payment.accountId === oldId) {
+                            payment.accountId = newId;
+                        }
+                    }
+                    
+                    migratedCount++;
+                    console.log(`✅ แปลงบัญชี: ${oldId} → ${newId}`);
+                }
+            } catch (error) {
+                console.error(`❌ แปลงบัญชี ${account.id} ล้มเหลว:`, error);
+            }
+        }
+    }
+    
+    if (migratedCount > 0) {
+        // อัปเดต currentAccountId ถ้าจำเป็น
+        if (currentAccountId === 'default_acc' || currentAccountId === 'cash_acc') {
+            const newDefault = accounts.find(a => a.isDefault) || accounts[0];
+            if (newDefault) {
+                currentAccountId = newDefault.id;
+                localStorage.setItem('fin_current_account', currentAccountId);
+            }
+        }
+        
+        saveAccounts();
+        savePaymentsToStorage();
+        
+        console.log(`✅ แปลง legacy accounts สำเร็จ: ${migratedCount} บัญชี`);
+        showToast(`✅ แปลงบัญชีสำเร็จ ${migratedCount} บัญชี`, 'success');
+    }
+    
+    return migratedCount > 0;
+}
+
+
+
+let accounts = [];
 let currentAccountId = localStorage.getItem('fin_current_account') || 'default_acc';
 let accountFilterId = 'all'; 
 let budgetMode = 'percentage'; 
@@ -260,13 +416,13 @@ let isShowingBackendData = false;
 
         let currentDate = new Date();
         let displayYear = currentDate.getFullYear();
-        let currentType = 'income', currentManageType = 'spending', editingTxId = null, editingCatId = null, editingTagName = null, selectedIcon = '📁', yearlyChart = null, currentFontSize = localStorage.getItem('fin_fontsize') || 'medium';
-let reportDateRange = {
-    startDate: null,
-    endDate: null,
-    accountId: 'all', 
-    isCustomRange: false
-};
+        let currentType = 'income', currentManageType = 'spending', editingTxId = null, editingCatId = null, editingTagName = null, editingTagId = null, selectedIcon = '📁', yearlyChart = null, currentFontSize = localStorage.getItem('fin_fontsize') || 'medium';
+        let reportDateRange = {
+            startDate: null,
+            endDate: null,
+            accountId: 'all', 
+            isCustomRange: false
+        };
         
         let analysisPeriod = 'month'; 
         let analysisDate = new Date(); 
@@ -2101,16 +2257,27 @@ function updateMobileAccountSelect() {
     const mobileSelect = document.getElementById('mobileAccountSelect');
     if (!mobileSelect) return;
     
-    console.log('🔄 Updating mobile account select, accounts:', accounts.length);
+    // ✅ กรอง accounts ตาม owner
+    let filteredAccounts = accounts;
     
-    if (accounts.length === 0) {
+    if (isLoggedIn) {
+        filteredAccounts = accounts.filter(acc => 
+            acc.owner_type === 'user' && acc.owner_id === currentUser.id
+        );
+    } else {
+        const guestId = getGuestId();
+        filteredAccounts = accounts.filter(acc => 
+            acc.owner_type === 'guest' && acc.owner_id === guestId
+        );
+    }
+    
+    if (filteredAccounts.length === 0) {
         mobileSelect.innerHTML = '<option value="">-- ไม่มีบัญชี --</option>';
         return;
     }
     
-    // ✅ สร้าง options จาก accounts
     let optionsHTML = '';
-    accounts.forEach(acc => {
+    filteredAccounts.forEach(acc => {
         const balance = getAccountBalance(acc.id);
         const selected = (acc.id === currentAccountId) ? 'selected' : '';
         optionsHTML += `
@@ -2122,18 +2289,13 @@ function updateMobileAccountSelect() {
     
     mobileSelect.innerHTML = optionsHTML;
     
-    // ✅ ตรวจสอบว่า currentAccountId อยู่ใน dropdown หรือไม่
-    if (currentAccountId && !accounts.some(a => a.id === currentAccountId)) {
-        // ถ้าไม่เจอ ให้เลือกตัวแรก
-        if (accounts.length > 0) {
-            mobileSelect.value = accounts[0].id;
-            console.log('📌 currentAccountId not found, using first account:', accounts[0].id);
+    if (!filteredAccounts.some(a => a.id === currentAccountId)) {
+        if (filteredAccounts.length > 0) {
+            currentAccountId = filteredAccounts[0].id;
+            localStorage.setItem('fin_current_account', currentAccountId);
+            mobileSelect.value = currentAccountId;
         }
-    } else if (currentAccountId) {
-        mobileSelect.value = currentAccountId;
     }
-    
-    console.log('✅ Mobile account select updated, selected:', mobileSelect.value);
 }
 
 function closeMobileForm() {
@@ -2770,7 +2932,9 @@ function updateCopyBudgetButtonText() {
 
 window.onload = async () => {  // ← เพิ่ม async
     console.log("=== WINDOW LOAD START ===");
-    
+
+    initializeDefaultAccounts();
+
     document.body.classList.add('dark');
     setFontSize(currentFontSize, false);
     updateMonthDisplay();
@@ -6364,34 +6528,63 @@ function updateYearlyTagsUI() {
 
     let sourceTransactions = getCurrentTransactions();
     
-const filteredTransactions = accountFilterId !== 'all' 
+    const filteredTransactions = accountFilterId !== 'all' 
         ? sourceTransactions.filter(t => 
             t.accountId === accountFilterId ||  
             (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
           )
         : sourceTransactions;
     
-filteredTransactions.forEach(t => {
-    const parts = t.monthKey.split('-');
-    const y = parseInt(parts[0]);
-    const m = parseInt(parts[1]);
-    
-    if (y === displayYear && t.tag && t.tag.trim() !== '') {
-        const tag = t.tag.trim();
-        if (!tagData[tag]) tagData[tag] = Array(12).fill(0);
-        tagData[tag][m-1] += t.amount;
-    }
-});
-            const sortedTags = Object.keys(tagData).sort();
-            const body = document.getElementById('yearlyTagsBody');
-            if (sortedTags.length === 0) { body.innerHTML = `<tr><td colspan="15" class="p-12 text-center text-slate-400 italic text-xs">ไม่มีข้อมูลการใช้ TAG ในปีนี้</td></tr>`; return; }
-            body.innerHTML = sortedTags.map(tag => {
-                const monthlyValues = tagData[tag];
-                const rowTotal = monthlyValues.reduce((a, b) => a + b, 0);
-                const avg = rowTotal / 12;
-                return `<tr><td class="px-4 py-3 font-bold sticky left-0 z-10 bg-white dark:bg-slate-900 dark:text-white border-r border-slate-100 dark:border-slate-800"># ${tag}</td>${monthlyValues.map(v => `<td class="px-3 py-3 text-center text-slate-500">${v > 0 ? v.toLocaleString() : '-'}</td>`).join('')}<td class="px-4 py-3 text-right font-bold text-amber-600 bg-amber-50/30 dark:text-amber-400 dark:bg-amber-900/10">฿${rowTotal.toLocaleString()}</td><td class="px-4 py-3 text-right text-slate-400">฿${avg.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td></tr>`;
-            }).join('');
+    filteredTransactions.forEach(t => {
+        const parts = t.monthKey.split('-');
+        const y = parseInt(parts[0]);
+        const m = parseInt(parts[1]);
+        
+        if (y === displayYear && t.tag && t.tag.trim() !== '') {
+            const tag = t.tag.trim();
+            if (!tagData[tag]) tagData[tag] = Array(12).fill(0);
+            tagData[tag][m-1] += t.amount;
         }
+    });
+    
+    const sortedTags = Object.keys(tagData).sort();
+    const body = document.getElementById('yearlyTagsBody');
+    
+    if (sortedTags.length === 0) { 
+        body.innerHTML = `<tr><td colspan="15" class="p-12 text-center text-slate-400 italic text-xs">ไม่มีข้อมูลการใช้ TAG ในปีนี้</td></tr>`; 
+        return; 
+    }
+    
+    body.innerHTML = sortedTags.map(tag => {
+        const monthlyValues = tagData[tag];
+        const rowTotal = monthlyValues.reduce((a, b) => a + b, 0);
+        const avg = rowTotal / 12;
+        
+        return `<tr>
+            <td class="px-4 py-3 font-bold sticky left-0 z-10 bg-white dark:bg-slate-900 dark:text-white border-r border-slate-100 dark:border-slate-800">
+                # ${tag}
+            </td>
+            ${monthlyValues.map((v, monthIdx) => {
+                
+                if (v > 0) {
+                    return `<td onclick="openYearlyTagModal('${tag.replace(/'/g, "\\'")}', ${monthIdx}, ${displayYear})" 
+                               class="px-3 py-3 text-center text-slate-500 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors relative group">
+                                ${v.toLocaleString()}
+                                <span class="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-400 scale-x-0 group-hover:scale-x-100 transition-transform"></span>
+                            </td>`;
+                } else {
+                    return `<td class="px-3 py-3 text-center text-slate-400">-</td>`;
+                }
+            }).join('')}
+            <td class="px-4 py-3 text-right font-bold text-amber-600 bg-amber-50/30 dark:text-amber-400 dark:bg-amber-900/10">
+                ฿${rowTotal.toLocaleString()}
+            </td>
+            <td class="px-4 py-3 text-right text-slate-400">
+                ฿${avg.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            </td>
+        </tr>`;
+    }).join('');
+}
 
 function switchYearlyTab(tabId) {
     document.querySelectorAll('.yearly-tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -6691,25 +6884,65 @@ async function saveDebtPaymentToBackend(paymentData) {
 async function updateDebtPaymentInBackend(paymentData) {
     if (!isLoggedIn || !navigator.onLine) return false;
     
-    // ถ้าเป็น temporary ID ให้บันทึกใหม่เลย
+    // ✅ ถ้าเป็น temporary ID ให้บันทึกใหม่เลย
     if (paymentData.id.toString().startsWith('payment_')) {
         return saveDebtPaymentToBackend(paymentData);
     }
     
     try {
+        // ✅ ตรวจสอบว่า paymentId เป็นตัวเลข
+        const paymentId = parseInt(paymentData.id);
+        if (isNaN(paymentId)) {
+            console.error('Invalid payment ID:', paymentData.id);
+            return false;
+        }
+
+                // ============================================
+        // ✅ เพิ่มตรงนี้: ตรวจสอบว่า payment มีอยู่จริงไหม
+        // ============================================
+        const checkResponse = await fetch(`${API_URL}/debt-payments?user_id=${currentUser.id}`);
+        const existingPayments = await checkResponse.json();
+        const paymentExists = existingPayments.some(p => p.id == paymentId);
+        
+        if (!paymentExists) {
+            console.log(`⚠️ Payment ${paymentId} not found in backend, attempting to create new one...`);
+            // สร้างใหม่แทนการ update
+            return saveDebtPaymentToBackend({
+                id: `payment_${Date.now()}`,
+                debtId: paymentData.debtId,
+                accountId: paymentData.accountId,
+                amount: paymentData.amount,
+                date: paymentData.date,
+                note: paymentData.note || ''
+            });
+        }
+
+        // ============================================
+        
+        // ✅ แปลง accountId เป็น integer
+        let accountId = null;
+        if (paymentData.accountId) {
+            accountId = parseInt(paymentData.accountId);
+            if (isNaN(accountId)) {
+                // ถ้าแปลงไม่ได้ ให้ลองหาจาก accounts array
+                const account = accounts.find(a => a.id === paymentData.accountId);
+                accountId = account ? parseInt(account.id) : null;
+            }
+        }
+        
         console.log('📤 Updating payment in backend:', {
-            id: paymentData.id,
+            id: paymentId,
             amount: paymentData.amount,
             date: paymentData.date,
-            accountId: paymentData.accountId
+            accountId: accountId
         });
         
-        const response = await fetch(`${API_URL}/debt-payments/${paymentData.id}`, {
+        const response = await fetch(`${API_URL}/debt-payments/${paymentId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 user_id: currentUser.id,
-                accountId: paymentData.accountId,
+                accountId: accountId,
                 amount: paymentData.amount,
                 payment_date: paymentData.date,
                 note: paymentData.note || ''
@@ -7530,7 +7763,8 @@ function recordPayment(debtId) {
     
     updatePaymentAccountSelect();
 
-    const saveBtn = document.querySelector('#paymentModal button[onclick="updatePayment"]');
+    // ✅ ใช้ getElementById
+    const saveBtn = document.getElementById('paymentSaveBtn');
     if (saveBtn) {
         saveBtn.textContent = 'บันทึกการชำระ';
         saveBtn.onclick = savePayment;
@@ -7606,7 +7840,8 @@ function editPayment(paymentId) {
     document.getElementById('paymentDate').value = payment.date;
     document.getElementById('paymentNote').value = payment.note || '';
     
-    const saveBtn = document.querySelector('#paymentModal button[onclick="savePayment()"]');
+    // ✅ ใช้ getElementById
+    const saveBtn = document.getElementById('paymentSaveBtn');
     if (saveBtn) {
         saveBtn.textContent = 'อัปเดตการชำระ';
         saveBtn.onclick = updatePayment;
@@ -7757,7 +7992,8 @@ function resetPaymentModal() {
         accountSelect.value = currentAccountId; 
     }
     
-    const saveBtn = document.querySelector('#paymentModal button[onclick="updatePayment"]');
+    // ✅ ใช้ getElementById แทน querySelector
+    const saveBtn = document.getElementById('paymentSaveBtn');
     if (saveBtn) {
         saveBtn.textContent = 'บันทึกการชำระ';
         saveBtn.onclick = savePayment;
@@ -8243,6 +8479,107 @@ function openYearlyCategoryModal(category, monthIndex, year) {
     document.getElementById('yearlyCategoryDetailModal').classList.remove('hidden');
 }
 
+function openYearlyTagModal(tagName, monthIndex, year) {
+    console.log(`เปิด modal: Tag #${tagName} เดือนที่ ${monthIndex + 1} ปี ${year}`);
+    
+    const monthKey = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
+    
+    // โหลด transactions
+    let sourceTransactions = getCurrentTransactions();
+    
+    // กรองตาม account filter
+    let filteredTransactions = sourceTransactions;
+    if (accountFilterId !== 'all') {
+        filteredTransactions = sourceTransactions.filter(t => 
+            t.accountId === accountFilterId || 
+            (t.type === 'transfer' && t.transferToAccountId === accountFilterId)
+        );
+    }
+    
+    // กรองตาม monthKey และ tag
+    const tagTransactions = filteredTransactions.filter(t => 
+        t.monthKey === monthKey && 
+        t.tag && 
+        t.tag.trim() === tagName
+    );
+    
+    // เรียงลำดับตามวันที่ (ล่าสุดขึ้นบน)
+    tagTransactions.sort((a, b) => {
+        const dateA = new Date(a.rawDate || a.date);
+        const dateB = new Date(b.rawDate || b.date);
+        return dateB - dateA;
+    });
+    
+    const totalAmount = tagTransactions.reduce((sum, t) => sum + t.amount, 0);
+    const monthNames = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", 
+                        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+    
+    // ตั้งค่าหัวข้อ modal
+    document.getElementById('modalCategoryIcon').textContent = '🏷️';
+    document.getElementById('modalCategoryTitle').textContent = `🏷️ Tag: #${tagName}`;
+    document.getElementById('modalCategoryPeriod').textContent = `${monthNames[monthIndex]} ${year}`;
+    document.getElementById('modalTotalAmount').textContent = `฿${totalAmount.toLocaleString()}`;
+    document.getElementById('modalTransactionCount').textContent = `${tagTransactions.length} รายการ`;
+    
+    const listContainer = document.getElementById('yearlyCategoryDetailList');
+    
+    if (tagTransactions.length === 0) {
+        listContainer.innerHTML = `
+            <div class="p-8 text-center text-slate-400 italic">
+                <div class="text-4xl mb-2">🏷️</div>
+                <p>ไม่มีรายการในเดือนนี้</p>
+            </div>
+        `;
+    } else {
+        listContainer.innerHTML = tagTransactions.map(t => {
+            const date = new Date(t.rawDate || t.date);
+            const dateStr = date.toLocaleDateString('th-TH', { 
+                day: 'numeric', 
+                month: 'short', 
+                year: 'numeric' 
+            });
+            
+            const tag = t.tag ? `<span class="text-[10px] font-bold text-indigo-400 uppercase ml-2">[${t.tag}]</span>` : '';
+            const amountClass = t.type === 'income' ? 'text-emerald-500' : 'text-rose-500';
+            const prefix = t.type === 'income' ? '+' : '-';
+            
+            const onClickAction = isMobile() 
+                ? `onclick="showMobileActionModal('${t.id}')"`
+                : '';
+            
+            return `
+            <div ${onClickAction} class="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-700/50 rounded-2xl border border-slate-100 dark:border-slate-600 group hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${isMobile() ? 'cursor-pointer' : ''}">
+                <div class="flex items-center gap-3">
+                    <div class="text-2xl">${t.icon}</div>
+                    <div>
+                        <p class="font-bold text-sm dark:text-white">${t.desc}${tag}</p>
+                        <p class="text-xs text-slate-400">${dateStr} • ${t.category}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <p class="font-bold text-base ${amountClass}">${prefix}฿${t.amount.toLocaleString()}</p>
+                    <div class="flex gap-1 ${isMobile() ? 'hidden' : 'opacity-0 group-hover:opacity-100 transition-opacity'}">
+                        <button onclick="editTransaction('${t.id}')" class="p-1 text-indigo-400 hover:text-indigo-600" title="แก้ไข">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                        </button>
+                        <button onclick="deleteTransaction('${t.id}')" class="p-1 text-rose-400 hover:text-rose-600" title="ลบ">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            `;
+        }).join('');
+    }
+    
+    // ใช้ modal เดิม
+    document.getElementById('yearlyCategoryDetailModal').classList.remove('hidden');
+}
+
 function closeYearlyCategoryModal() {
     document.getElementById('yearlyCategoryDetailModal').classList.add('hidden');
 }
@@ -8498,52 +8835,45 @@ function getAccountBalance(accountId) {
     const account = accounts.find(a => a.id === accountId);
     if (!account) return 0;
     
-    let baseBalance = account.initialBalance || 0;
+    // ✅ เริ่มจาก initialBalance
+    let balance = account.initialBalance || 0;
     
-    console.log(`💰 [DEBUG] คำนวณยอด ${account.name} (${accountId})`);
-    console.log(`   initialBalance: ${baseBalance}`);
-    
+    // ✅ บวก/ลบ จาก transactions ทั้งหมด
     transactions.forEach(t => {
-        if (t.accountId === accountId) {
-            console.log(`   transaction: id=${t.id}, type=${t.type}, amount=${t.amount}, isInitialBalance=${t.isInitialBalance}, transferType=${t.transferType}`);
-        }
-        
-        // ข้าม transaction ที่เป็น initial balance
+        // ข้าม transaction ที่เป็น initial balance (เพราะเอาไปคิดแล้ว)
         if (t.isInitialBalance && t.accountId === accountId) {
-            console.log(`   ⏭️ ข้าม initial balance transaction: ${t.id}`);
             return;
         }
         
-        // รายรับ/รายจ่ายปกติ
+        // เฉพาะ transaction ที่เกี่ยวข้องกับบัญชีนี้
         if (t.accountId === accountId) {
             if (t.type === 'income') {
-                baseBalance += t.amount;
-                console.log(`   +${t.amount} (income)`);
+                balance += t.amount;
             } else if (t.type === 'expense') {
-                baseBalance -= t.amount;
-                console.log(`   -${t.amount} (expense)`);
+                balance -= t.amount;
             } else if (t.type === 'transfer') {
-                // Transfer ฝั่งต้นทาง (หักเงิน)
+                // Transfer ฝั่งต้นทาง (หักเงิน) ทุกกรณี
                 if (t.transferType !== 'internal_receive') {
-                    baseBalance -= t.amount;
-                    console.log(`   -${t.amount} (transfer out, type=${t.transferType})`);
-                }
-                // ✅ Transfer ฝั่งรับ (บวกเงิน) - internal_receive
-                else if (t.transferType === 'internal_receive') {
-                    baseBalance += t.amount;
-                    console.log(`   +${t.amount} (transfer in, type=${t.transferType})`);
-                }
+                    balance -= t.amount;
+            }
+        }
+    }
+        // Transfer ฝั่งรับ (บวกเงิน) - เฉพาะ internal_receive
+        if (t.type === 'transfer' && t.transferToAccountId === accountId) {
+            if (t.transferType === 'internal') {
+                balance += t.amount;
             }
         }
     });
     
-    if (account.manualAdjustment !== undefined) {
-        baseBalance += account.manualAdjustment;
-        console.log(`   + manual adjustment: ${account.manualAdjustment}`);
+    // ✅ สำคัญ: บวก manualAdjustment (ค่าปรับยอดด้วยมือ)
+    if (account.manualAdjustment && account.manualAdjustment !== 0) {
+        balance += account.manualAdjustment;
+        console.log(`💰 [DEBUG] ${account.name}: + manualAdjustment ${account.manualAdjustment} → balance = ${balance}`);
     }
     
-    console.log(`   = ${baseBalance}`);
-    return baseBalance;
+    console.log(`💰 [DEBUG] ${account.name} (${accountId}) final balance: ${balance}`);
+    return balance;
 }
 
 function validateInitialBalanceTransaction(transactionData, isUpdate = false, oldTransaction = null) {
@@ -8604,9 +8934,10 @@ function updateAccountBalance(accountId) {
     return balance;
 }
 
-function calculateTotalBalance() {
+function calculateTotalBalance(accountsToCalculate = null) {
+    const targetAccounts = accountsToCalculate || accounts;
     let total = 0;
-    accounts.forEach(account => {
+    targetAccounts.forEach(account => {
         total += getAccountBalance(account.id);
     });
     return total;
@@ -8626,10 +8957,13 @@ function getDefaultAccount() {
 async function setDefaultAccount(accountId) {
     console.log('Setting default account:', accountId);
     
+    const account = accounts.find(a => a.id === accountId);
+    if (!account) return;
+    
     // อัปเดต local
-    accounts.forEach(account => {
-        account.isDefault = (account.id === accountId);
-        account.updatedAt = new Date().toISOString();
+    accounts.forEach(acc => {
+        acc.isDefault = (acc.id === accountId);
+        acc.updatedAt = new Date().toISOString();
     });
     
     currentAccountId = accountId;
@@ -8637,32 +8971,35 @@ async function setDefaultAccount(accountId) {
     
     saveAccounts();
     
-    // ✅ อัปเดต MySQL
-    if (isLoggedIn && navigator.onLine) {
-        for (const account of accounts) {
-            await updateAccountInBackend({
-                id: account.id,
-                name: account.name,
-                type: account.type,
-                icon: account.icon,
-                initialBalance: account.initialBalance,
-                isDefault: account.isDefault
+    // อัปเดต backend
+    if (isLoggedIn && navigator.onLine && account.backendId) {
+        try {
+            await fetch(`${API_URL}/accounts/${account.backendId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: currentUser.id,
+                    name: account.name,
+                    type: account.type,
+                    icon: account.icon,
+                    initialBalance: account.initialBalance || 0,
+                    isDefault: true
+                })
             });
+            console.log('✅ Updated default account in backend');
+        } catch (error) {
+            console.error('Error updating default account:', error);
         }
     }
     
     renderAccountsList();
-    refreshDesktopFormContainer();
-    
-    if (document.getElementById('transferFromAccount')) {
-        updateTransferAccountSelects();
-    }
-    
+    updateAccountSelect();
+    updateMobileAccountSelect();
     updateAccountFilterDropdown();
-
-    const account = getAccountById(accountId);
+    
     showToast(`✅ ตั้ง "${account.name}" เป็นบัญชีหลักแล้ว`);
 }
+
 
 function refreshDesktopFormContainer() {
     console.log('Refreshing desktop form container...');
@@ -8683,17 +9020,67 @@ function refreshDesktopFormContainer() {
 }
 
 function saveAccounts() {
-    localStorage.setItem('fin_accounts', JSON.stringify(accounts));
+    // ✅ Guest mode หรือ login + ติ๊ก checkbox → บันทึก localStorage
+    if (saveToLocalEnabled) {
+        localStorage.setItem('fin_accounts', JSON.stringify(accounts));
+        console.log('💾 Accounts saved to localStorage');
+    } else {
+        console.log('⏭️ Skip saving accounts to localStorage (saveToLocalEnabled = false)');
+    }
     
-    if (financeDB && financeDB.db) {
+    // ✅ บันทึก IndexedDB เฉพาะเมื่อ saveToLocalEnabled = true
+    if (saveToLocalEnabled && financeDB && financeDB.db) {
         financeDB.saveToIndexedDB('accounts', {
             id: 'user_accounts',
             data: accounts,
             updatedAt: new Date().toISOString()
-        });
+        }).catch(err => console.warn('IndexedDB save failed:', err));
+    }
+    
+    // ✅ บันทึกไป MySQL (เมื่อ login และ online)
+    if (isLoggedIn && navigator.onLine) {
+        syncAccountsToBackend();
     }
 }
 
+// ✅ ฟังก์ชันใหม่: sync accounts ไป MySQL
+async function syncAccountsToBackend() {
+    if (!isLoggedIn || !navigator.onLine) return;
+    
+    // กรองเฉพาะ accounts ที่เป็นของ user นี้
+    const userAccounts = accounts.filter(a => 
+        a.owner_type === 'user' && a.owner_id === currentUser.id
+    );
+    
+    for (const account of userAccounts) {
+        try {
+            const accountId = parseInt(account.id);
+            if (isNaN(accountId)) continue;
+            
+            // ✅ ตรวจสอบว่ามีการเปลี่ยนแปลง manualAdjustment หรือไม่
+            const response = await fetch(`${API_URL}/accounts/${accountId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: currentUser.id,
+                    name: account.name,
+                    type: account.type,
+                    icon: account.icon,
+                    initialBalance: account.initialBalance || 0,
+                    manualAdjustment: account.manualAdjustment || 0,
+                    lastAdjustment: account.lastAdjustment || null,
+                    isDefault: account.isDefault || false
+                })
+            });
+            
+            if (response.ok) {
+                console.log(`✅ Synced account ${account.name}: manualAdjustment=${account.manualAdjustment}`);
+            }
+        } catch (error) {
+            console.error('Error syncing account to backend:', error);
+        }
+    }
+}
 
 let adjustingAccountId = null;
 
@@ -8754,10 +9141,8 @@ function confirmAdjustBalance() {
         return;
     }
     
-    // ✅ แก้ไข: ใช้ adjustingAccountId แทน targetAccountId
     let baseTransactionBalance = account.initialBalance || 0;
     transactions.forEach(t => {
-        // ✅ ใช้ adjustingAccountId แทน targetAccountId
         if (t.accountId === adjustingAccountId) {
             if (t.type === 'income') baseTransactionBalance += t.amount;
             else if (t.type === 'expense') baseTransactionBalance -= t.amount;
@@ -8777,11 +9162,18 @@ function confirmAdjustBalance() {
     }
     
     const newManualAdjustment = newBalance - baseTransactionBalance;
+
+    const saveToLocalCheckbox = document.getElementById('saveToLocalCheckbox');
+    const shouldSaveToLocal = saveToLocalCheckbox ? saveToLocalCheckbox.checked : true;
     
     if (confirm(`ปรับยอดจาก ฿${currentBalance.toLocaleString()} เป็น ฿${newBalance.toLocaleString()}?`)) {
         account.manualAdjustment = newManualAdjustment;
-        account.lastAdjustment = new Date().toISOString();
-        account.updatedAt = new Date().toISOString();
+        
+        // ✅ แก้ไข: แปลงรูปแบบวันที่ให้ MySQL รองรับ
+        const now = new Date();
+        const formattedDate = now.toISOString().slice(0, 19).replace('T', ' ');
+        account.lastAdjustment = formattedDate;
+        account.updatedAt = formattedDate;
         
         if (!account.balanceAdjustments) {
             account.balanceAdjustments = [];
@@ -8793,27 +9185,103 @@ function confirmAdjustBalance() {
             baseBalance: baseTransactionBalance,
             adjustment: newManualAdjustment
         });
-        
-        saveAccounts();
+
+        if (shouldSaveToLocal) {
+            saveAccounts();
+            console.log('💾 Saved adjustment to localStorage');
+        } else {
+            console.log('⏭️ Skip saving to localStorage (checkbox not checked)');
+        }
+
+        if (isLoggedIn && navigator.onLine) {
+            const accountIdNum = parseInt(account.id);
+            if (!isNaN(accountIdNum)) {
+                fetch(`${API_URL}/accounts/${accountIdNum}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: currentUser.id,
+                        name: account.name,
+                        type: account.type,
+                        icon: account.icon,
+                        initialBalance: account.initialBalance || 0,
+                        manualAdjustment: newManualAdjustment,
+                        lastAdjustment: formattedDate,  // ✅ ส่งรูปแบบ YYYY-MM-DD HH:MM:SS
+                        isDefault: account.isDefault || false
+                    })
+                }).then(response => {
+                    if (response.ok) {
+                        console.log('✅ Manual adjustment saved to MySQL');
+                    } else {
+                        console.error('❌ Failed to save adjustment to MySQL');
+                    }
+                }).catch(error => {
+                    console.error('Error saving adjustment to MySQL:', error);
+                });
+            }
+        } else if (isLoggedIn && !navigator.onLine && shouldSaveToLocal) {
+            addToSyncQueue({
+                type: 'adjust_balance',
+                accountId: account.id,
+                manualAdjustment: newManualAdjustment,
+                lastAdjustment: formattedDate
+            }, 'update_account');
+            showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
+        } else if (!isLoggedIn && shouldSaveToLocal) {
+            console.log('👤 Guest mode: adjustment saved to localStorage only');
+        }    
         
         renderAccountsList();
-        
         closeAdjustBalanceModal();
         
         showToast(`✅ ปรับยอด ${account.name} สำเร็จ: ฿${newBalance.toLocaleString()}`);
     }
 }
 
+// ✅ ฟังก์ชันช่วย debug
+function debugAccountAdjustments() {
+    console.log('=== ACCOUNT ADJUSTMENTS DEBUG ===');
+    accounts.forEach(acc => {
+        if (acc.owner_type === 'user') {
+            console.log(`${acc.name} (${acc.id}):`);
+            console.log(`  initialBalance: ${acc.initialBalance}`);
+            console.log(`  manualAdjustment: ${acc.manualAdjustment}`);
+            console.log(`  lastAdjustment: ${acc.lastAdjustment}`);
+            console.log(`  balanceAdjustments count: ${acc.balanceAdjustments?.length || 0}`);
+        }
+    });
+    console.log('================================');
+}
 
+// เรียกใช้ตอนโหลดหน้า
+window.debugAccountAdjustments = debugAccountAdjustments;
 
 function renderAccountsList() {
     const container = document.getElementById('accountsListContainer');
     if (!container) return;
     
-    document.getElementById('totalAccountsCount').textContent = accounts.length;
-    document.getElementById('totalBalanceAll').textContent = `฿${calculateTotalBalance().toLocaleString()}`;
+    // ✅ กรอง accounts ตาม owner
+    let filteredAccounts = accounts;
     
-    if (accounts.length === 0) {
+    if (isLoggedIn) {
+        // User mode: แสดงเฉพาะ accounts ที่เป็นของ user นี้
+        filteredAccounts = accounts.filter(acc => 
+            acc.owner_type === 'user' && acc.owner_id === currentUser.id
+        );
+        console.log(`👤 User mode: แสดง ${filteredAccounts.length} จาก ${accounts.length} บัญชี`);
+    } else {
+        // Guest mode: แสดงเฉพาะ accounts ที่เป็นของ guest นี้
+        const guestId = getGuestId();
+        filteredAccounts = accounts.filter(acc => 
+            acc.owner_type === 'guest' && acc.owner_id === guestId
+        );
+        console.log(`👤 Guest mode: แสดง ${filteredAccounts.length} จาก ${accounts.length} บัญชี`);
+    }
+    
+    document.getElementById('totalAccountsCount').textContent = filteredAccounts.length;
+    document.getElementById('totalBalanceAll').textContent = `฿${calculateTotalBalance(filteredAccounts).toLocaleString()}`;
+    
+    if (filteredAccounts.length === 0) {
         container.innerHTML = `
             <div class="text-center py-8">
                 <div class="text-4xl mb-2">🏦</div>
@@ -8826,21 +9294,18 @@ function renderAccountsList() {
         return;
     }
     
-    container.innerHTML = accounts.map(account => {
+    container.innerHTML = filteredAccounts.map(account => {
         const balance = getAccountBalance(account.id);
         const balanceClass = balance >= 0 ? 'text-emerald-600' : 'text-rose-600';
         const isDefault = account.isDefault ? 'บัญชีหลัก' : '';
         
-        const hasAdjustment = account.adjustedBalance !== undefined ? 
-            '<span class="ml-1 text-[8px] bg-indigo-100 text-indigo-600 px-1 rounded">ปรับแล้ว</span>' : '';
-        
         return `
-        <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-7  00">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700">
             <div class="flex justify-between items-start mb-2">
                 <div class="flex items-center gap-3">
                     <div class="text-2xl">${account.icon}</div>
                     <div>
-                        <p class="font-bold dark:text-white">${account.name} ${hasAdjustment}</p>
+                        <p class="font-bold dark:text-white">${account.name}</p>
                         <p class="text-xs text-slate-400">${account.type} • ${isDefault}</p>
                     </div>
                 </div>
@@ -8857,24 +9322,17 @@ function renderAccountsList() {
                         class="px-3 py-1 bg-slate-100 text-slate-600 text-xs rounded-lg hover:bg-slate-200 ${account.isDefault ? 'bg-indigo-100 text-indigo-600' : ''}">
                     ${account.isDefault ? '✅ หลักแล้ว' : 'ตั้งเป็นหลัก'}
                 </button>
-                 <!-- ⭐⭐ ปุ่ม 3 ปุ่ม: ปรับยอด/แก้ไข/ลบ ⭐⭐ -->
                 <div class="flex gap-1">
-                    <!-- ปุ่มปรับยอด (ใหม่) -->
                     <button onclick="openAdjustBalanceModal('${account.id}')" 
-                            class="px-3 py-1 bg-amber-50 text-amber-600 text-xs rounded-lg hover:bg-amber-100 flex items-center gap-1"
-                            title="ปรับยอดคงเหลือ">
+                            class="px-3 py-1 bg-amber-50 text-amber-600 text-xs rounded-lg hover:bg-amber-100 flex items-center gap-1">
                         <span>⚖️</span>
                         <span>ปรับยอด</span>
                     </button>
-                    
-                    <!-- ปุ่มแก้ไข -->
                     <button onclick="editAccount('${account.id}')" 
                             class="px-3 py-1 bg-blue-50 text-blue-600 text-xs rounded-lg hover:bg-blue-100 flex items-center gap-1">
                         <span>✎</span>
                         <span>แก้ไข</span>
                     </button>
-                    
-                    <!-- ปุ่มลบ -->
                     <button onclick="deleteAccount('${account.id}')" 
                             class="px-3 py-1 bg-rose-50 text-rose-600 text-xs rounded-lg hover:bg-rose-100 flex items-center gap-1"
                             ${account.isDefault ? 'disabled' : ''}>
@@ -8887,6 +9345,7 @@ function renderAccountsList() {
         `;
     }).join('');
 }
+
 
 
 let editingAccountId = null;
@@ -9039,34 +9498,47 @@ async function saveAccount() {
     const initialBalance = parseFloat(document.getElementById('accountInitialBalance').value) || 0;
     const isDefault = document.getElementById('isDefaultAccount').checked;
     
+    // ✅ อ่านค่า checkbox ก่อน
+    const saveToLocalCheckbox = document.getElementById('saveToLocalCheckbox');
+    const shouldSaveToLocal = saveToLocalCheckbox ? saveToLocalCheckbox.checked : true;
+    
     if (editingAccountId) {
         // แก้ไขบัญชี
-        const account = getAccountById(editingAccountId);
-        if (!account) {
+        const accountIndex = accounts.findIndex(a => a.id === editingAccountId);
+        if (accountIndex === -1) {
             showToast('ไม่พบข้อมูลบัญชี');
             return;
         }
         
-        const oldInitialBalance = account.initialBalance || 0;
+        const oldAccount = accounts[accountIndex];
+        const oldInitialBalance = oldAccount.initialBalance || 0;
         const isChangingInitialBalance = (initialBalance !== oldInitialBalance);
         
+        // ตรวจสอบการเปลี่ยนแปลงยอดเริ่มต้น
         if (isChangingInitialBalance) {
-            // ✅ ตรวจสอบว่ามี transaction ใดๆ ของบัญชีนี้หรือไม่ (รวม initial balance)
             const hasAnyTransaction = transactions.some(t => 
-                t.accountId === editingAccountId
+                t.accountId === editingAccountId 
             );
             
             if (hasAnyTransaction) {
-                showToast('⚠️ ไม่สามารถแก้ไขยอดเริ่มต้นผ่านหน้าแก้ไขบัญชีได้ เนื่องจากมีรายการในบัญชีนี้แล้ว (ให้แก้ไขผ่านหน้า history แทน)', 'error');
+                alert('⚠️ ไม่สามารถแก้ไขได้ เนื่องจากมีรายการยอดเริ่มต้นในบัญชีนี้แล้ว\n\n💡 กรุณาไปแก้ไขที่หน้า history (หน้าแรก → ประวัติ) แทน'); 
+                const accountModal = document.getElementById('accountModal');
+                if (accountModal) accountModal.classList.add('hidden');
+                switchPage('overview');  // หรือไปหน้าที่มีประวัติ
+                
                 document.getElementById('accountInitialBalance').value = oldInitialBalance;
                 return;
             }
             
-            // ✅ ถ้าไม่มี transaction เลย (บัญชีใหม่ที่ยังไม่มีข้อมูล) ให้สร้าง transaction ใหม่
+            // อัปเดตหรือสร้าง initial balance transaction
             if (initialBalance > 0) {
+                const existingInitial = transactions.find(t => 
+                    t.accountId === editingAccountId && t.isInitialBalance === true
+                );
+                
                 const now = new Date();
-                const newTransaction = {
-                    id: `initial_${account.id}_${Date.now()}`,
+                const initialTransaction = {
+                    id: existingInitial?.id || `initial_${editingAccountId}_${Date.now()}`,
                     amount: initialBalance,
                     type: 'income',
                     category: 'อื่นๆ',
@@ -9076,116 +9548,193 @@ async function saveAccount() {
                     rawDate: now.toISOString().split('T')[0],
                     monthKey: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
                     date: now.toISOString().split('T')[0],
-                    accountId: account.id,
+                    accountId: editingAccountId,
                     isInitialBalance: true,
-                    createdAt: now.toISOString(),
+                    createdAt: existingInitial?.createdAt || now.toISOString(),
                     updatedAt: now.toISOString(),
                     owner_type: isLoggedIn ? 'user' : 'guest',
                     owner_id: isLoggedIn ? currentUser.id : getGuestId()
                 };
                 
-                // บันทึก transaction
-                if (isLoggedIn) {
-                    await saveLoggedInTransaction(newTransaction);
+                if (existingInitial) {
+                    const index = transactions.findIndex(t => t.id === existingInitial.id);
+                    if (index !== -1) transactions[index] = initialTransaction;
                 } else {
-                    await saveGuestTransaction(newTransaction);
+                    transactions.unshift(initialTransaction);
+                }
+
+                if (isLoggedIn && navigator.onLine) {
+            // ตรวจสอบว่าเป็น ID ที่ถูกต้อง (ตัวเลข) หรือไม่
+            const isValidId = /^\d+$/.test(initialTransaction.id.toString());
+            
+            if (existingInitial && isValidId) {
+                // แก้ไข transaction ที่มีอยู่ (PUT)
+                await updateTransactionInBackend(initialTransaction);
+                console.log('✅ Updated initial transaction in MySQL');
+            } else {
+                // สร้าง transaction ใหม่ (POST)
+                const result = await saveTransactionToBackend(initialTransaction);
+                if (result && result.id) {
+                    initialTransaction.id = result.id.toString();
+                    initialTransaction.backendId = result.id;
+                    console.log('✅ Created new initial transaction in MySQL');
+                    
+                    // อัปเดตใน transactions array
+                    const txIndex = transactions.findIndex(t => t.id === initialTransaction.id);
+                    if (txIndex !== -1) {
+                        transactions[txIndex] = initialTransaction;
+                    }
+                }
+            }
+        }
+                
+                // ✅ บันทึกเฉพาะเมื่อ shouldSaveToLocal = true
+                if (shouldSaveToLocal) {
+                    await financeDB.saveTransaction(initialTransaction);
                 }
             }
         }
         
         // อัปเดตข้อมูลบัญชี
-        account.name = name;
-        account.type = type;
-        account.icon = selectedAccountIcon;
-        account.initialBalance = initialBalance;
-        account.updatedAt = new Date().toISOString();
-
-        if (isLoggedIn && navigator.onLine) {
-            await updateAccountInBackend(account);
-        }
-        
-        if (isDefault) {
-            setDefaultAccount(account.id);
-        } else if (account.isDefault && !isDefault) {
-            const otherAccount = accounts.find(a => a.id !== account.id);
-            if (otherAccount) {
-                setDefaultAccount(otherAccount.id);
-            }
-        }
-        
-        saveAccounts();
-        renderAccountsList();
-        closeAccountModal();
-        updateAccountSelect();
-        updateAccountFilterDropdown();
-        
-        showToast('อัปเดตบัญชีสำเร็จ');
-        
-    } else {
-        // เพิ่มบัญชีใหม่
-        const newAccount = {
-            id: 'acc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-            name,
-            type,
+        const updatedAccount = {
+            ...oldAccount,
+            name: name,
+            type: type,
             icon: selectedAccountIcon,
-            color: getRandomAccountColor(),
             initialBalance: initialBalance,
-            isDefault: false,
-            createdAt: new Date().toISOString(),
+            isDefault: isDefault,
             updatedAt: new Date().toISOString()
         };
         
-        accounts.push(newAccount);
-
-        // บันทึกบัญชีไป MySQL (ถ้า login และออนไลน์)
+        accounts[accountIndex] = updatedAccount;
+        
+        // ✅ บันทึกไป backend (MySQL) เสมอเมื่อ login และ online
         if (isLoggedIn && navigator.onLine) {
-            await saveAccountToBackend(newAccount);
+            const backendResult = await saveAccountToBackend(updatedAccount);
+            if (!backendResult.success && !backendResult.offline) {
+                showToast('❌ บันทึกไม่สำเร็จ: ' + (backendResult.error || 'Unknown error'));
+                return;
+            }
+        } else if (isLoggedIn && !navigator.onLine && shouldSaveToLocal) {
+            // Offline + login + ติ๊ก checkbox → เก็บในคิว
+            addToSyncQueue(updatedAccount, 'update_account');
+            showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
         }
         
-        // บันทึก initial transaction (ถ้ามียอดเริ่มต้น)
-        if (initialBalance > 0) {
-            const now = new Date();
-            const initialTransaction = {
-                id: `initial_${newAccount.id}`,
-                amount: initialBalance,
-                type: 'income',
-                category: 'อื่นๆ',
-                icon: '💰',
-                desc: `ยอดเริ่มต้นบัญชี ${name}`,
-                tag: '#เปิดบัญชี',
-                rawDate: now.toISOString().split('T')[0],
-                monthKey: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
-                date: now.toISOString().split('T')[0],
-                accountId: newAccount.id,
-                isInitialBalance: true,
-                createdAt: now.toISOString(),
-                updatedAt: now.toISOString(),
-                owner_type: isLoggedIn ? 'user' : 'guest',
-                owner_id: isLoggedIn ? currentUser.id : getGuestId()
-            };
-            
-            if (isLoggedIn) {
-                await saveLoggedInTransaction(initialTransaction);
-            } else {
-                await saveGuestTransaction(initialTransaction);
+        // ✅ บันทึก local เฉพาะเมื่อ shouldSaveToLocal = true
+        if (shouldSaveToLocal) {
+            saveAccounts();
+        }
+        
+        // ตั้งค่าเป็นบัญชีหลักถ้าจำเป็น
+        if (isDefault && currentAccountId !== updatedAccount.id) {
+            await setDefaultAccount(updatedAccount.id);
+        } else if (!isDefault && oldAccount.isDefault) {
+            const otherAccount = accounts.find(a => a.id !== updatedAccount.id);
+            if (otherAccount) {
+                await setDefaultAccount(otherAccount.id);
             }
         }
         
-        // ตั้งค่าเป็นบัญชีหลัก
-        if (isDefault) {
-            setDefaultAccount(newAccount.id);
-        } else if (accounts.length === 1) {
-            setDefaultAccount(newAccount.id);
-        }
-        
-        saveAccounts();
+        updateUI();
+        renderCalendar();
+        refreshAnalysisCharts();
+
         renderAccountsList();
         closeAccountModal();
         updateAccountSelect();
         updateAccountFilterDropdown();
         
-        showToast('✅ เพิ่มบัญชีสำเร็จ');
+        showToast('✅ อัปเดตบัญชีสำเร็จ');
+        
+    } else {
+    // เพิ่มบัญชีใหม่
+    const newAccount = {
+        id: `acc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: name,
+        type: type,
+        icon: selectedAccountIcon,
+        color: getRandomAccountColor(),
+        initialBalance: initialBalance,
+        isDefault: isDefault,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        owner_type: isLoggedIn ? 'user' : 'guest',
+        owner_id: isLoggedIn ? currentUser.id : getGuestId()
+    };
+    
+    accounts.push(newAccount);
+    
+    // ✅ บันทึกไป backend (MySQL) เมื่อ login และ online
+    if (isLoggedIn && navigator.onLine) {
+        const backendResult = await saveAccountToBackend(newAccount);
+        
+        if (backendResult.success && backendResult.id && backendResult.id !== newAccount.id) {
+            newAccount.id = backendResult.id;
+            newAccount.backendId = parseInt(backendResult.id);
+            
+            const index = accounts.findIndex(a => a.id === newAccount.id);
+            if (index !== -1) {
+                accounts[index] = newAccount;
+            }
+        }
+    } else if (isLoggedIn && !navigator.onLine && shouldSaveToLocal) {
+        addToSyncQueue(newAccount, 'create_account');
+        showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
     }
+    
+    // ✅ สร้าง initial balance transaction (ใช้ saveTransactionToBackend โดยตรง)
+if (initialBalance > 0) {
+    const now = new Date();
+    const initialTransaction = {
+        id: `initial_${newAccount.id}_${Date.now()}`,
+        amount: initialBalance,
+        type: 'income',
+        category: 'อื่นๆ',
+        icon: '💰',
+        desc: `ยอดเริ่มต้นบัญชี ${name}`,
+        tag: '#เปิดบัญชี',
+        rawDate: now.toISOString().split('T')[0],
+        monthKey: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
+        date: now.toISOString().split('T')[0],
+        accountId: newAccount.id,
+        isInitialBalance: true,
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+        owner_type: isLoggedIn ? 'user' : 'guest',
+        owner_id: isLoggedIn ? currentUser.id : getGuestId()
+    };
+    
+    transactions.unshift(initialTransaction);
+    
+    // ✅ บันทึก MySQL โดยตรง (ไม่ผ่าน saveLoggedInTransaction)
+    if (isLoggedIn && navigator.onLine) {
+        const result = await saveTransactionToBackend(initialTransaction);
+        if (result && result.id) {
+            initialTransaction.id = result.id.toString();
+            initialTransaction.backendId = result.id;
+            console.log('✅ Initial transaction saved to MySQL:', result.id);
+        }
+    }
+    
+    // บันทึก local ตามเงื่อนไข
+    if (shouldSaveToLocal) {
+        await financeDB.saveTransaction(initialTransaction);
+    }
+}
+    
+
+    updateUI();
+    renderCalendar();
+    refreshAnalysisCharts();
+
+    renderAccountsList();
+    closeAccountModal();
+    updateAccountSelect();
+    updateAccountFilterDropdown();
+    
+    showToast('✅ เพิ่มบัญชีสำเร็จ');
+}
 }
 
 async function updateAccountInBackend(accountData) {
@@ -9301,6 +9850,8 @@ async function performDeleteAccount(accountId) {
         // 2. ลบจาก local (accounts array)
         accounts = accounts.filter(a => a.id !== accountId);
         saveAccounts();
+
+        
         
         // 3. ลบ transactions ที่เกี่ยวข้องจาก local
         const beforeTxCount = transactions.length;
@@ -9336,7 +9887,16 @@ async function performDeleteAccount(accountId) {
             }
         }
         
+         if (isLoggedIn && navigator.onLine) {
+            console.log('🔄 Reloading data from backend...');
+            await loadTransactionsFromBackend();
+            await loadAccountsFromBackend();
+            transactions = backendTransactions;
+        }
+
         // 5. อัปเดต UI
+        console.log('🔄 Updating UI...');
+        updateUI()
         renderAccountsList();
         updateAccountSelect();
         updateAccountFilterDropdown();
@@ -9348,15 +9908,18 @@ async function performDeleteAccount(accountId) {
         if (currentAccountId === accountId && accounts.length > 0) {
             const newDefault = accounts.find(a => a.isDefault) || accounts[0];
             if (newDefault) {
-                setDefaultAccount(newDefault.id);
+                await setDefaultAccount(newDefault.id);
             }
         }
+
+        hideConfirm();
         
         showToast(`✅ ลบบัญชี "${accountName}" และ ${deletedTxCount} รายการที่เกี่ยวข้อง สำเร็จ`);
         
     } catch (error) {
         console.error('❌ Error deleting account:', error);
         showToast(`❌ ${error.message}`);
+        hideConfirm();
     }
 }
 
@@ -9372,19 +9935,44 @@ function getRandomAccountColor() {
 
 function updateAccountSelect() {
     const desktopSelect = document.getElementById('accountSelect');
-    if (desktopSelect) {
-        desktopSelect.innerHTML = accounts.map(acc => `
-            <option value="${acc.id}" ${acc.id === currentAccountId ? 'selected' : ''}>
-                ${acc.icon} ${acc.name}
-            </option>
-        `).join('');
-        
-        // ✅ ไม่ต้องแปลงเป็น parseInt
-        if (!desktopSelect.value || !accounts.some(a => a.id === desktopSelect.value)) {
+    if (!desktopSelect) return;
+    
+    // ✅ กรอง accounts ตาม owner
+    let filteredAccounts = accounts;
+    
+    if (isLoggedIn) {
+        filteredAccounts = accounts.filter(acc => 
+            acc.owner_type === 'user' && acc.owner_id === currentUser.id
+        );
+    } else {
+        const guestId = getGuestId();
+        filteredAccounts = accounts.filter(acc => 
+            acc.owner_type === 'guest' && acc.owner_id === guestId
+        );
+    }
+    
+    if (filteredAccounts.length === 0) {
+        desktopSelect.innerHTML = '<option value="">-- ไม่มีบัญชี --</option>';
+        return;
+    }
+    
+    desktopSelect.innerHTML = filteredAccounts.map(acc => `
+        <option value="${acc.id}" ${acc.id === currentAccountId ? 'selected' : ''}>
+            ${acc.icon} ${acc.name}
+        </option>
+    `).join('');
+    
+    // ตรวจสอบว่า currentAccountId ยังอยู่ใน filteredAccounts หรือไม่
+    if (!filteredAccounts.some(a => a.id === currentAccountId)) {
+        if (filteredAccounts.length > 0) {
+            currentAccountId = filteredAccounts[0].id;
+            localStorage.setItem('fin_current_account', currentAccountId);
             desktopSelect.value = currentAccountId;
         }
     }
 }
+
+
 
 function updateAccountFilterDropdown() {
     const dropdownIds = [
@@ -9397,9 +9985,27 @@ function updateAccountFilterDropdown() {
         'yearlyAccountFilterDesktop'
     ];
     
+    // ✅ กรอง accounts ตาม mode ปัจจุบัน
+    let filteredAccounts = [];
+    
+    if (isLoggedIn) {
+        // User mode: แสดงเฉพาะ accounts ที่เป็นของ user นี้
+        filteredAccounts = accounts.filter(acc => 
+            acc.owner_type === 'user' && acc.owner_id === currentUser.id
+        );
+        console.log(`👤 User mode: แสดง ${filteredAccounts.length} จาก ${accounts.length} บัญชีใน dropdown`);
+    } else {
+        // Guest mode: แสดงเฉพาะ accounts ที่เป็นของ guest นี้
+        const guestId = getGuestId();
+        filteredAccounts = accounts.filter(acc => 
+            acc.owner_type === 'guest' && acc.owner_id === guestId
+        );
+        console.log(`👤 Guest mode: แสดง ${filteredAccounts.length} จาก ${accounts.length} บัญชีใน dropdown`);
+    }
+    
     const optionsHTML = `
         <option value="all">📊 ทุกบัญชี</option>
-        ${accounts.map(acc => `
+        ${filteredAccounts.map(acc => `
             <option value="${acc.id}">
                 ${acc.icon} ${acc.name}
             </option>
@@ -9411,7 +10017,17 @@ function updateAccountFilterDropdown() {
         if (select) {
             const currentValue = accountFilterId === 'all' ? 'all' : accountFilterId;
             select.innerHTML = optionsHTML;
-            select.value = currentValue;
+            
+            // ✅ ตรวจสอบว่า currentValue ยังอยู่ใน filteredAccounts หรือไม่
+            const valueExists = currentValue === 'all' || filteredAccounts.some(a => a.id === currentValue);
+            if (valueExists) {
+                select.value = currentValue;
+            } else {
+                // ถ้า filter เดิมไม่มีใน filteredAccounts ให้ reset เป็น 'all'
+                select.value = 'all';
+                accountFilterId = 'all';
+                localStorage.setItem('fin_account_filter', 'all');
+            }
             
             select.removeEventListener('change', applyAccountFilter);
             select.addEventListener('change', applyAccountFilter);
@@ -9747,16 +10363,33 @@ async function saveLoggedInTransaction(transactionData) {
             accountId: backendData.accountId
         });
         
-        // ✅ บันทึก MySQL ก่อน
+        // ============================================
+        // ✅ แก้ไข: ตรวจสอบว่าเป็น ID ที่ถูกต้อง (ตัวเลข) ก่อน PUT
+        // ============================================
+        const isValidIdForUpdate = isUpdate && transactionData.id && /^\d+$/.test(transactionData.id.toString());
+        
+        // ✅ บันทึก MySQL
         if (navigator.onLine) {
             let result;
-            if (isUpdate) {
+            if (isUpdate && isValidIdForUpdate) {
+                // แก้ไข transaction (PUT) - เฉพาะ ID ที่เป็นตัวเลข
                 result = await updateTransactionInBackend(backendData);
                 if (result && result.success) {
                     backendId = result.id;
                     backendSuccess = true;
                 }
+            } else if (isUpdate && !isValidIdForUpdate) {
+                // ID ไม่ถูกต้อง (เช่น initial_xxx) → ให้สร้างใหม่แทน
+                console.log('⚠️ Invalid ID for update, creating new transaction instead');
+                result = await saveTransactionToBackend(backendData);
+                if (result && result.id) {
+                    backendId = result.id;
+                    transactionData.id = backendId.toString();
+                    transactionData.backendId = backendId;
+                    backendSuccess = true;
+                }
             } else {
+                // เพิ่ม transaction ใหม่ (POST)
                 result = await saveTransactionToBackend(backendData);
                 if (result && result.id) {
                     backendId = result.id;
@@ -9781,7 +10414,7 @@ async function saveLoggedInTransaction(transactionData) {
                 if (isUpdate) {
                     const oldAmount = account.initialBalance;
                     account.initialBalance = transactionData.amount;
-                    console.log(`✅ อัปเดต account.initialBalance จาก ${oldAmount} เป็น ${account.initialBalance} for account ${account.name}`);
+                    console.log(`✅ อัปเดต account.initialBalance จาก ${oldAmount} เป็น ${account.initialBalance}`);
                     
                     if (isLoggedIn && navigator.onLine) {
                         await updateAccountInitialBalanceInBackend(account.id, account.initialBalance);
@@ -9794,7 +10427,7 @@ async function saveLoggedInTransaction(transactionData) {
                     );
                     if (!existingInitial) {
                         account.initialBalance = transactionData.amount;
-                        console.log(`✅ ตั้งค่า account.initialBalance = ${account.initialBalance} for account ${account.name}`);
+                        console.log(`✅ ตั้งค่า account.initialBalance = ${account.initialBalance}`);
                         
                         if (isLoggedIn && navigator.onLine) {
                             await updateAccountInitialBalanceInBackend(account.id, account.initialBalance);
@@ -9808,19 +10441,8 @@ async function saveLoggedInTransaction(transactionData) {
             }
         }
         
-        console.log('🔍 Before handleDebtPayment:', {
-    isDebtPayment: transactionData.isDebtPayment,
-    editingTxId: editingTxId,
-    editingDebtPaymentId: window.editingDebtPaymentId
-});
-
-if (transactionData.isDebtPayment) {
-    console.log('📞 Calling handleDebtPayment...');
-    await handleDebtPayment(transactionData);
-} else {
-    console.log('⏭️ Skip handleDebtPayment (isDebtPayment = false)');
-}
-
+        // ... ส่วนที่เหลือ (handleDebtPayment, บันทึก local, etc.) เหมือนเดิม ...
+        
         // บันทึกในเครื่องตาม checkbox
         if (saveToLocalEnabled) {
             console.log('💾 Saving to local storage...');
@@ -9830,7 +10452,6 @@ if (transactionData.isDebtPayment) {
             }
         } else {
             console.log('☁️ Skip saving to local (saveToLocalEnabled = false)');
-            // ถ้าไม่บันทึก local แต่ต้องการให้ transactions array มีข้อมูลปัจจุบัน
             if (editingTxId) {
                 const index = transactions.findIndex(t => t.id === editingTxId);
                 if (index !== -1) {
@@ -9950,22 +10571,52 @@ function validateInitialBalanceTransaction(transactionData, isUpdate = false, ol
 }
 
 async function saveGuestTransaction(transactionData) {
-       console.log('👤 Guest mode - transactionData:', transactionData);
+    console.log('👤 Guest mode - transactionData:', transactionData);
     console.log('👤 Guest mode - financeDB.saveToLocalEnabled:', financeDB?.saveToLocalEnabled);
-    console.log('👤 Guest mode - financeDB.saveToIndexedDBEnabled:', financeDB?.saveToIndexedDBEnabled);
+    
     try {
         if (!transactionData.accountId) {
             console.warn('⚠️ Guest mode: ไม่มี accountId, ใช้ default');
             const defaultAccount = accounts.find(a => a.isDefault);
             transactionData.accountId = defaultAccount ? defaultAccount.id : 'default_acc';
         }
-        console.log('👤 Guest mode: กำลังบันทึก...');
         
+        // ✅ เพิ่ม: จัดการ initial balance transaction
+        if (transactionData.isInitialBalance) {
+            console.log('✅ Processing initial balance transaction in Guest mode');
+            const account = accounts.find(a => a.id === transactionData.accountId);
+            if (account) {
+                const isUpdate = !!editingTxId;
+                
+                if (isUpdate) {
+                    // แก้ไข: อัปเดตยอด
+                    const oldAmount = account.initialBalance;
+                    account.initialBalance = transactionData.amount;
+                    console.log(`✅ อัปเดต account.initialBalance จาก ${oldAmount} เป็น ${account.initialBalance} for account ${account.name}`);
+                } else {
+                    // เพิ่มใหม่: ตรวจสอบซ้ำ
+                    const existingInitial = transactions.some(t => 
+                        t.accountId === transactionData.accountId && 
+                        t.isInitialBalance && 
+                        t.id !== transactionData.id
+                    );
+                    if (!existingInitial) {
+                        account.initialBalance = transactionData.amount;
+                        console.log(`✅ ตั้งค่า account.initialBalance = ${account.initialBalance} for account ${account.name}`);
+                    } else {
+                        showToast('⚠️ บัญชีนี้มีรายการยอดเริ่มต้นอยู่แล้ว', 'error');
+                        return;
+                    }
+                }
+                saveAccounts(); // บันทึกลง localStorage
+            }
+        }
+        
+        console.log('👤 Guest mode: กำลังบันทึก...');
         let result = await financeDB.saveTransaction(transactionData);
         
         if (!result || !result.success) {
             console.log('⚠️ Guest mode: FinanceDB ล้มเหลว, ใช้ localStorage โดยตรง');
-            
             const localTx = JSON.parse(localStorage.getItem('fin_tx_v5') || '[]');
             localTx.unshift(transactionData);
             localStorage.setItem('fin_tx_v5', JSON.stringify(localTx.slice(0, 1000)));
@@ -9974,7 +10625,6 @@ async function saveGuestTransaction(transactionData) {
             if (!exists) {
                 transactions.unshift(transactionData);
             }
-            
             result = { success: true };
         }
         
@@ -10154,38 +10804,108 @@ async function deleteTransactionFromBackend(transactionId) {
 }
 
 async function saveAccountToBackend(accountData) {
-    if (!isLoggedIn || !navigator.onLine) return false;
+    if (!isLoggedIn || !navigator.onLine) {
+        if (saveToLocalEnabled) {
+            addToSyncQueue(accountData, 'create_account');
+            showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
+            return { success: true, offline: true, id: accountData.id };
+        }
+        return { success: false, error: 'Offline and save to local disabled' };
+    }
     
     try {
-        const response = await fetch(`${API_URL}/accounts`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                user_id: currentUser.id,
-                name: accountData.name,
-                type: accountData.type,
-                icon: accountData.icon,
-                initialBalance: accountData.initialBalance || 0,  // ✅ ส่ง initialBalance
-                isDefault: accountData.isDefault || false
-            })
-        });
+        // ✅ ตรวจสอบว่าเป็นบัญชีใหม่หรือไม่ (id ขึ้นต้นด้วย acc_ หรือ legacy)
+        const isNewAccount = !accountData.id || 
+                             accountData.id.startsWith('acc_') || 
+                             accountData.id === 'default_acc' || 
+                             accountData.id === 'cash_acc';
         
-        const result = await response.json();
+        let response;
+        let result;
         
-        if (response.ok && result.id) {
-            console.log('✅ บันทึก account ที่ backend สำเร็จ');
+        if (isNewAccount) {
+            // ✅ สร้างบัญชีใหม่ ใช้ POST เสมอ
+            console.log('📤 Creating new account:', accountData.name);
             
-            accountData.id = result.id.toString();
-            accountData.numericId = result.id;
-            saveAccounts();
+            response = await fetch(`${API_URL}/accounts`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: currentUser.id,
+                    name: accountData.name,
+                    type: accountData.type,
+                    icon: accountData.icon,
+                    initialBalance: accountData.initialBalance || 0,
+                    isDefault: accountData.isDefault || false
+                })
+            });
             
-            return true;
+            result = await response.json();
+            
+            if (response.ok && result.id) {
+                const newId = result.id.toString();
+                console.log(`✅ สร้างบัญชีใหม่ที่ backend: ${accountData.name} → ID ${newId}`);
+                
+                // ✅ อัปเดต id ใน accountData
+                accountData.id = newId;
+                accountData.backendId = result.id;
+                
+                // ✅ อัปเดตใน accounts array
+                const index = accounts.findIndex(a => a.id === accountData.id || a.id === accountData.id);
+                if (index !== -1) {
+                    accounts[index] = accountData;
+                    saveAccounts();
+                }
+                
+                return { success: true, id: newId, isNew: true };
+            } else {
+                console.error('❌ Backend error:', result);
+                return { success: false, error: result.error || 'Unknown error' };
+            }
+        } else {
+            // ✅ อัปเดตบัญชีที่มีอยู่ (เฉพาะเมื่อ id เป็นตัวเลขเท่านั้น)
+            // ตรวจสอบว่า id เป็นตัวเลขหรือไม่
+            const accountIdNum = parseInt(accountData.id);
+            if (isNaN(accountIdNum)) {
+                console.error('❌ Invalid account ID for update:', accountData.id);
+                return { success: false, error: 'Invalid account ID' };
+            }
+            
+            console.log('📤 Updating existing account:', accountIdNum);
+            
+            response = await fetch(`${API_URL}/accounts/${accountIdNum}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: currentUser.id,
+                    name: accountData.name,
+                    type: accountData.type,
+                    icon: accountData.icon,
+                    initialBalance: accountData.initialBalance || 0,
+                    isDefault: accountData.isDefault || false
+                })
+            });
+            
+            result = await response.json();
+            
+            if (response.ok) {
+                console.log(`✅ อัปเดตบัญชีที่ backend: ${accountData.id}`);
+                return { success: true, id: accountData.id, isNew: false };
+            } else {
+                console.error('❌ Backend error:', result);
+                return { success: false, error: result.error || 'Unknown error' };
+            }
         }
-        return false;
         
     } catch (error) {
-        console.error('❌ บันทึก account ไม่สำเร็จ:', error);
-        return false;
+        console.error('❌ Error saving account:', error);
+        
+        if (saveToLocalEnabled) {
+            addToSyncQueue(accountData, 'create_account');
+            return { success: true, offline: true, id: accountData.id, error: error.message };
+        }
+        
+        return { success: false, error: error.message };
     }
 }
 
@@ -10302,6 +11022,20 @@ async function handleDebtPayment(transactionData) {
                     newDate: updatedPayment.date
                 });
                 
+                // ============================================
+            // ✅ เพิ่ม log ตรวจสอบ Payment IDs ตรงนี้
+            // ============================================
+            console.log('🔍 ===== PAYMENT ID CHECK =====');
+            console.log('🔍 transactionData.originalPaymentId:', transactionData.originalPaymentId);
+            console.log('🔍 updatedPayment.id:', updatedPayment.id);
+            console.log('🔍 window.editingDebtPaymentId:', window.editingDebtPaymentId);
+            console.log('🔍 Are they equal?', {
+                'transactionData vs updatedPayment': transactionData.originalPaymentId === updatedPayment.id,
+                'transactionData vs editingDebtPaymentId': transactionData.originalPaymentId === window.editingDebtPaymentId,
+                'updatedPayment vs editingDebtPaymentId': updatedPayment.id === window.editingDebtPaymentId
+            });
+            console.log('🔍 ============================');
+
                 // อัปเดตใน memory
                 payments[paymentIndex] = updatedPayment;
                 console.log('✅ Updated payments array in memory');
@@ -10317,6 +11051,11 @@ async function handleDebtPayment(transactionData) {
                         date: updatedPayment.date,
                         note: updatedPayment.note
                     });
+
+                    // ============================================
+                // ✅ เพิ่ม log ก่อนเรียก API
+                // ============================================
+                console.log('🔍 Calling updateDebtPaymentInBackend with paymentId:', updatedPayment.id);
                     
                     const success = await updateDebtPaymentInBackend({
                         id: updatedPayment.id,
@@ -10598,7 +11337,11 @@ async function saveTransaction() {
     
     const transactionData = prepareTransactionData();
     
-    await handleDebtPayment(transactionData);
+    
+ if (!isLoggedIn && transactionData.isDebtPayment) {
+        await handleDebtPayment(transactionData);
+    }
+    
     await handleMonthChange(transactionData);
     
     if (isLoggedIn) {
@@ -10739,14 +11482,23 @@ function resetForm() {
     const btnIncome = document.getElementById('btn-income');
     const btnExpense = document.getElementById('btn-expense');
     
-    if (categorySelect) categorySelect.disabled = false;
-    if (accountSelect) accountSelect.disabled = false;
+    if (categorySelect) {
+        categorySelect.disabled = false;
+        categorySelect.classList.remove('bg-slate-100', 'cursor-not-allowed');
+    }
+    if (accountSelect) {
+        accountSelect.disabled = false;
+        accountSelect.classList.remove('bg-slate-100', 'cursor-not-allowed');
+    }
     if (btnIncome) btnIncome.disabled = false;
     if (btnExpense) btnExpense.disabled = false;
     
     // ✅ ลบ warning message
-    const warning = document.getElementById('initialBalanceWarning');
-    if (warning) warning.remove();
+    const initialWarning = document.getElementById('initialBalanceWarning');
+    if (initialWarning) initialWarning.remove();
+    
+    const debtWarning = document.getElementById('debtPaymentWarning');
+    if (debtWarning) debtWarning.remove();
 }
         
 function editTransaction(id) { 
@@ -10776,6 +11528,64 @@ function editTransaction(id) {
         
         if (document.getElementById('accountSelect')) {
             document.getElementById('accountSelect').value = transaction.accountId;
+        }
+        
+        // ✅ ✅ ✅ เพิ่ม: ล็อคหมวดหมู่และบัญชีสำหรับ initial balance transaction
+        if (transaction.isInitialBalance) {
+            console.log('🏦 Editing initial balance transaction - locking category and account');
+            
+            const categorySelect = document.getElementById('category');
+            const accountSelect = document.getElementById('accountSelect');
+            const btnIncome = document.getElementById('btn-income');
+            const btnExpense = document.getElementById('btn-expense');
+            
+            // Disable หมวดหมู่
+            if (categorySelect) {
+                categorySelect.disabled = true;
+                categorySelect.classList.add('bg-slate-100', 'cursor-not-allowed');
+            }
+            
+            // Disable บัญชี
+            if (accountSelect) {
+                accountSelect.disabled = true;
+                accountSelect.classList.add('bg-slate-100', 'cursor-not-allowed');
+            }
+            
+            // Disable ปุ่มเปลี่ยนประเภท (income/expense)
+            if (btnIncome) btnIncome.disabled = true;
+            if (btnExpense) btnExpense.disabled = true;
+            
+            // แสดงข้อความเตือน
+            if (!document.getElementById('initialBalanceWarning')) {
+                const warningMsg = document.createElement('div');
+                warningMsg.id = 'initialBalanceWarning';
+                warningMsg.className = 'text-amber-600 text-xs mt-2 p-2 bg-amber-50 rounded-lg border border-amber-200';
+                warningMsg.innerHTML = '⚠️ รายการนี้เป็นยอดเริ่มต้นบัญชี - ไม่สามารถเปลี่ยนหมวดหมู่หรือบัญชีได้ (แก้ไขได้เฉพาะจำนวนเงิน)';
+                const submitBtn = document.getElementById('submitBtn');
+                if (submitBtn) {
+                    submitBtn.insertAdjacentHTML('beforebegin', warningMsg.outerHTML);
+                }
+            }
+        } else {
+            // ปลดล็อค (เผื่อเคยกด edit initial balance แล้วมา edit รายการอื่น)
+            const categorySelect = document.getElementById('category');
+            const accountSelect = document.getElementById('accountSelect');
+            const btnIncome = document.getElementById('btn-income');
+            const btnExpense = document.getElementById('btn-expense');
+            
+            if (categorySelect) {
+                categorySelect.disabled = false;
+                categorySelect.classList.remove('bg-slate-100', 'cursor-not-allowed');
+            }
+            if (accountSelect) {
+                accountSelect.disabled = false;
+                accountSelect.classList.remove('bg-slate-100', 'cursor-not-allowed');
+            }
+            if (btnIncome) btnIncome.disabled = false;
+            if (btnExpense) btnExpense.disabled = false;
+            
+            const warning = document.getElementById('initialBalanceWarning');
+            if (warning) warning.remove();
         }
         
         // ✅ สำหรับ debt payment: เก็บ originalPaymentId เสมอ (ไม่ว่า checkbox จะติ๊กหรือไม่)
@@ -10949,7 +11759,17 @@ async function performDelete(transaction, id) {
 }
 
         function toggleSettingsModal() { document.getElementById('settingsModal').classList.toggle('hidden'); }
-        function openManageTagsModal() { document.getElementById('manageTagsModal').classList.remove('hidden'); renderTagList(); toggleSettingsModal(); }
+        function openManageTagsModal() { 
+            if (isLoggedIn && navigator.onLine) {
+                loadTagsFromBackend().then(() => {
+                    renderTagList();
+                });
+            } else {
+                renderTagList();
+            }
+            document.getElementById('manageTagsModal').classList.remove('hidden'); 
+            toggleSettingsModal(); 
+        }
         function closeManageTagsModal() { document.getElementById('manageTagsModal').classList.add('hidden'); }
         function openManageCatsModal() { document.getElementById('manageCatsModal').classList.remove('hidden'); setManageType(currentManageType); toggleSettingsModal(); }
         function closeManageCatsModal() { document.getElementById('manageCatsModal').classList.add('hidden'); }
@@ -10960,12 +11780,193 @@ async function performDelete(transaction, id) {
         function prepareEditCat(id) { editingCatId = id; const c = customCategories[currentManageType].find(x => x.id === id); document.getElementById('newCatName').value = c.label; selectedIcon = c.icon; document.getElementById('selectedIconDisplay').innerText = c.icon; document.getElementById('saveCatBtn').innerText = "บันทึก"; document.getElementById('cancelCatEditBtn').classList.remove('hidden'); }
         function cancelCatEdit() { editingCatId = null; document.getElementById('newCatName').value = ''; selectedIcon = '📁'; document.getElementById('selectedIconDisplay').innerText = '📁'; document.getElementById('saveCatBtn').innerText = "เพิ่ม"; document.getElementById('cancelCatEditBtn').classList.add('hidden'); }
         function saveNewCategory() {
-            const name = document.getElementById('newCatName').value.trim(); if (!name) return;
-            if (editingCatId) { const idx = customCategories[currentManageType].findIndex(x => x.id === editingCatId); customCategories[currentManageType][idx] = { ...customCategories[currentManageType][idx], label: name, icon: selectedIcon }; }
-            else { customCategories[currentManageType].push({ id: Date.now().toString(), label: name, icon: selectedIcon }); }
-            localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories)); updateCategorySelect(); cancelCatEdit(); renderCatList(); showToast("สำเร็จ");
+    const name = document.getElementById('newCatName').value.trim();
+    if (!name) {
+        showToast("กรุณากรอกชื่อหมวดหมู่");
+        return;
+    }
+    
+    const newCategory = {
+        id: editingCatId || Date.now().toString(),
+        label: name,
+        icon: selectedIcon,
+        default: null
+    };
+    
+    // Guest mode: บันทึกแค่ LocalStorage
+    if (!isLoggedIn) {
+        if (editingCatId) {
+            const idx = customCategories[currentManageType].findIndex(x => x.id === editingCatId);
+            customCategories[currentManageType][idx] = newCategory;
+        } else {
+            customCategories[currentManageType].push(newCategory);
         }
-        function deleteCategory(id) { customCategories[currentManageType] = customCategories[currentManageType].filter(x => x.id !== id); localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories)); renderCatList(); updateCategorySelect(); }
+        
+        localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
+        updateCategorySelect();
+        cancelCatEdit();
+        renderCatList();
+        showToast("✅ เพิ่มหมวดหมู่สำเร็จ (Guest mode)");
+        return;
+    }
+    
+    // Login mode: บันทึก MySQL + LocalStorage
+    if (editingCatId) {
+        // แก้ไขหมวดหมู่
+        const idx = customCategories[currentManageType].findIndex(x => x.id === editingCatId);
+        customCategories[currentManageType][idx] = newCategory;
+    } else {
+        // เพิ่มหมวดหมู่ใหม่
+        customCategories[currentManageType].push(newCategory);
+    }
+    
+    // บันทึก LocalStorage ก่อน
+    localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
+    
+    // บันทึก MySQL (ถ้าออนไลน์)
+    if (navigator.onLine) {
+        saveCategoryToBackend(newCategory);
+    } else {
+        // ออฟไลน์: เก็บในคิวซิงค์
+        addToSyncQueue({
+            type: editingCatId ? 'update_category' : 'create_category',
+            data: newCategory,
+            categoryType: currentManageType
+        }, editingCatId ? 'update_category' : 'create_category');
+        showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
+    }
+    
+    updateCategorySelect();
+    cancelCatEdit();
+    renderCatList();
+    showToast(editingCatId ? "✅ แก้ไขหมวดหมู่สำเร็จ" : "✅ เพิ่มหมวดหมู่สำเร็จ");
+}
+        function deleteCategory(id) {
+    const categoryToDelete = customCategories[currentManageType].find(x => x.id === id);
+    if (!categoryToDelete) return;
+    
+    showConfirm("ลบหมวดหมู่?", `ลบหมวดหมู่ "${categoryToDelete.label}" แล้วไม่สามารถกู้คืนได้`, async () => {
+        
+        // Guest mode: ลบแค่ LocalStorage
+        if (!isLoggedIn) {
+            customCategories[currentManageType] = customCategories[currentManageType].filter(x => x.id !== id);
+            localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
+            renderCatList();
+            updateCategorySelect();
+            hideConfirm();
+            showToast("🗑️ ลบหมวดหมู่สำเร็จ (Guest mode)");
+            return;
+        }
+        
+        // Login mode: ลบ MySQL + LocalStorage
+        const originalCategories = JSON.parse(JSON.stringify(customCategories));
+        
+        // ลบ LocalStorage ก่อน
+        customCategories[currentManageType] = customCategories[currentManageType].filter(x => x.id !== id);
+        localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
+        
+        // ลบ MySQL (ถ้าออนไลน์)
+        if (navigator.onLine) {
+            const success = await deleteCategoryFromBackend(id);
+            if (!success) {
+                // ถ้าลบ MySQL ไม่สำเร็จ ให้ rollback LocalStorage
+                customCategories = originalCategories;
+                localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
+                renderCatList();
+                updateCategorySelect();
+                hideConfirm();
+                showToast("❌ ลบหมวดหมู่ไม่สำเร็จ", 'error');
+                return;
+            }
+        } else {
+            // ออฟไลน์: เก็บในคิวซิงค์
+            addToSyncQueue({
+                type: 'delete_category',
+                categoryId: id,
+                categoryType: currentManageType,
+                categoryData: categoryToDelete
+            }, 'delete_category');
+            showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
+        }
+        
+        renderCatList();
+        updateCategorySelect();
+        hideConfirm();
+        showToast("🗑️ ลบหมวดหมู่สำเร็จ");
+    });
+}
+async function saveCategoryToBackend(categoryData) {
+    if (!isLoggedIn || !navigator.onLine) return false;
+    
+    try {
+        const method = categoryData.id && !categoryData.id.toString().startsWith(Date.now().toString().substring(0, 4)) 
+            ? 'PUT' 
+            : 'POST';
+        
+        const url = method === 'POST' 
+            ? `${API_URL}/categories` 
+            : `${API_URL}/categories/${categoryData.id}`;
+        
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: currentUser.id,
+                type: currentManageType,
+                name: categoryData.label,
+                icon: categoryData.icon,
+                is_default: false
+            })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            
+            // ถ้าเป็นหมวดหมู่ใหม่ (POST) ให้อัปเดต id ให้ตรงกับ backend
+            if (method === 'POST' && result.id) {
+                categoryData.id = result.id.toString();
+                
+                // อัปเดตใน customCategories
+                const idx = customCategories[currentManageType].findIndex(c => c.id === categoryData.id);
+                if (idx !== -1) {
+                    customCategories[currentManageType][idx] = categoryData;
+                    localStorage.setItem('fin_custom_cats', JSON.stringify(customCategories));
+                }
+            }
+            
+            console.log(`✅ Category saved to backend: ${categoryData.label}`);
+            return true;
+        } else {
+            const error = await response.json();
+            console.error('Backend error:', error);
+            return false;
+        }
+    } catch (error) {
+        console.error('Error saving category to backend:', error);
+        return false;
+    }
+}
+async function deleteCategoryFromBackend(categoryId) {
+    if (!isLoggedIn || !navigator.onLine) return false;
+    
+    try {
+        const response = await fetch(`${API_URL}/categories/${categoryId}?user_id=${currentUser.id}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            console.log(`✅ Category deleted from backend: ${categoryId}`);
+            return true;
+        } else {
+            const error = await response.json();
+            console.error('Backend error:', error);
+            return false;
+        }
+    } catch (error) {
+        console.error('Error deleting category from backend:', error);
+        return false;
+    }
+}
         function openPortionModal(id, isInv) {
             editingCatId = id; const c = [...customCategories.spending, ...customCategories.investment].find(x => x.id === id);
             document.getElementById('modalIcon').innerText = c.icon; document.getElementById('portionCatName').innerText = c.label;
@@ -11196,6 +12197,12 @@ async function exportFullData() {
                 totalDebts: debts.length,
                 totalPayments: payments.length,
                 exportDate: new Date().toLocaleDateString('th-TH')
+            },
+
+            owner_info: {
+                isLoggedIn: isLoggedIn,
+                owner_type: isLoggedIn ? 'user' : 'guest',
+                owner_id: isLoggedIn ? currentUser.id : getGuestId()
             }
         };
         
@@ -11540,90 +12547,7 @@ async function resetAllData() {
     });
 }
 
-async function saveCurrentView() {
-    try {
-        console.log('💾 กำลังบันทึกหน้าต่างปัจจุบัน...');
-        
-        const currentView = {
-            page: getCurrentPage(),
-            month: currentDate.getMonth(),
-            year: currentDate.getFullYear(),
-            fontSize: currentFontSize,
-            darkMode: document.body.classList.contains('dark'),
-            analysisPeriod: analysisPeriod,
-            analysisDate: analysisDate.toISOString(),
-            displayYear: displayYear,
-            overviewTab: document.querySelector('#tab-history-btn.text-indigo-600, #tab-history-btn.text-indigo-400, #tab-history-btn.border-indigo-600') ? 'history' : 'calendar',
-            analysisTab: document.querySelector('.analysis-tab-btn.active')?.id?.replace('a-tab-', '') || 'overview',
-            yearlyTab: document.querySelector('.yearly-tab-btn.active')?.id?.replace('y-tab-', '') || 'category',
-            savedAt: new Date().toISOString(),
-            version: '2.0'
-        };
-        
-        console.log('📋 ข้อมูลที่จะบันทึก:', currentView);
-        
-        let savedToIndexedDB = false;
-        let savedToLocalStorage = false;
-        
-        if (financeDB && financeDB.db) {
-            try {
-                const transaction = financeDB.db.transaction(['metadata'], 'readwrite');
-                const store = transaction.objectStore('metadata');
-                
-                const saveData = {
-                    key: 'current_view',
-                    value: currentView,
-                    updatedAt: new Date().toISOString()
-                };
-                
-                await new Promise((resolve, reject) => {
-                    const request = store.put(saveData);
-                    request.onsuccess = () => {
-                        savedToIndexedDB = true;
-                        console.log('✅ บันทึกใน IndexedDB สำเร็จ');
-                        resolve();
-                    };
-                    request.onerror = (event) => {
-                        console.warn('⚠️ บันทึกใน IndexedDB ไม่สำเร็จ:', event.target.error);
-                        reject(event.target.error);
-                    };
-                });
-                
-            } catch (dbError) {
-                console.warn('⚠️ FinanceDB save error:', dbError);
-            }
-        }
-        
-        try {
-            localStorage.setItem('fin_current_view', JSON.stringify(currentView));
-            savedToLocalStorage = true;
-            console.log('✅ บันทึกใน LocalStorage สำเร็จ');
-        } catch (lsError) {
-            console.error('❌ LocalStorage error:', lsError);
-        }
-        
-        let message;
-        if (savedToIndexedDB && savedToLocalStorage) {
-            message = "💾 บันทึกใน IndexedDB + LocalStorage สำเร็จ";
-        } else if (savedToLocalStorage) {
-            message = "💾 บันทึกใน LocalStorage สำเร็จ (IndexedDB ไม่พร้อม)";
-        } else {
-            message = "❌ บันทึกไม่สำเร็จ";
-        }
-        
-        showToast(message);
-        console.log('🎉 บันทึกเสร็จสิ้น:', { savedToIndexedDB, savedToLocalStorage });
-        
-        if (isMobile()) {
-                    switchPage('overview');
-                    showToast("✅ บันทึกสำเร็จ! กลับไปหน้าหลัก");
-                }
 
-    } catch (error) {
-        console.error('❌ เกิดข้อผิดพลาดในการบันทึก:', error);
-        showToast("❌ บันทึกไม่สำเร็จ: " + error.message);
-    }
-}
 
 function getCurrentPage() {
     if (!document.getElementById('page-overview').classList.contains('hidden')) return 'overview';
@@ -11877,23 +12801,31 @@ async function importLegacyJSON(oldData) {
         if (oldData.data && oldData.data.transactions) {
             oldTransactions = oldData.data.transactions;
         }
-        
         else if (oldData.transactions && Array.isArray(oldData.transactions)) {
             oldTransactions = oldData.transactions;
         }
-       
         else if (Array.isArray(oldData)) {
             oldTransactions = oldData;
         }
         
         console.log(`📦 พบ ${oldTransactions.length} transactions ในไฟล์เก่า`);
         
+        // ✅ เพิ่ม: ถ้าเป็น Guest mode ให้แปลง owner_type และ owner_id
+        const isGuestMode = !isLoggedIn;
+        const guestId = isGuestMode ? getGuestId() : null;
+        
         for (let i = 0; i < oldTransactions.length; i++) {
             try {
                 const oldTx = oldTransactions[i];
-                const newTx = convertLegacyTransaction(oldTx);
+                let newTx = convertLegacyTransaction(oldTx);
                 
                 if (newTx) {
+                    // ✅ แปลง owner สำหรับ Guest mode
+                    if (isGuestMode) {
+                        newTx.owner_type = 'guest';
+                        newTx.owner_id = guestId;
+                    }
+                    
                     const result = await financeDB.saveTransaction(newTx);
                     
                     if (result.success) {
@@ -11921,6 +12853,7 @@ async function importLegacyJSON(oldData) {
             }
         }
         
+        // ✅ แปลง categories (ไม่มี owner, ไม่ต้องแปลง)
         if (oldData.categories || (oldData.data && oldData.data.categories)) {
             const oldCats = oldData.categories || oldData.data.categories;
             if (oldCats) {
@@ -11930,6 +12863,7 @@ async function importLegacyJSON(oldData) {
             }
         }
         
+        // ✅ แปลง budgets (ไม่มี owner, ไม่ต้องแปลง)
         if (oldData.budgets || (oldData.data && oldData.data.budgets)) {
             const oldBudgets = oldData.budgets || oldData.data.budgets;
             if (oldBudgets) {
@@ -11939,10 +12873,17 @@ async function importLegacyJSON(oldData) {
             }
         }
         
+        // ✅ แปลง accounts (ต้องแปลง owner สำหรับ Guest mode)
         if (oldData.accounts || (oldData.data && oldData.data.accounts)) {
             const oldAccounts = oldData.accounts || oldData.data.accounts;
             if (oldAccounts && Array.isArray(oldAccounts)) {
-                for (const acc of oldAccounts) {
+                for (let acc of oldAccounts) {
+                    // ✅ แปลง owner สำหรับ Guest mode
+                    if (isGuestMode) {
+                        acc.owner_type = 'guest';
+                        acc.owner_id = guestId;
+                    }
+                    
                     const exists = accounts.some(a => a.id === acc.id);
                     if (!exists) {
                         accounts.push(acc);
@@ -12139,20 +13080,32 @@ async function importVersionedData(data) {
         
         const sourceData = data.data || data;
         
+        // ✅ เพิ่ม: ถ้าเป็น Guest mode ให้แปลง owner_type และ owner_id
+        const isGuestMode = !isLoggedIn;
+        const guestId = isGuestMode ? getGuestId() : null;
+        
+        // ✅ แปลง accounts
         if (sourceData.accounts && Array.isArray(sourceData.accounts)) {
             console.log(`📥 นำเข้าบัญชี ${sourceData.accounts.length} บัญชี`);
             
-            sourceData.accounts.forEach(newAccount => {
-                const exists = accounts.some(acc => acc.id === newAccount.id);
-                if (!exists) {
-                    accounts.push(newAccount);
+            for (let acc of sourceData.accounts) {
+                // ✅ แปลง owner สำหรับ Guest mode
+                if (isGuestMode) {
+                    acc.owner_type = 'guest';
+                    acc.owner_id = guestId;
                 }
-            });
+                
+                const exists = accounts.some(a => a.id === acc.id);
+                if (!exists) {
+                    accounts.push(acc);
+                }
+            }
             
             saveAccounts();
             showToast(`✅ นำเข้าบัญชี ${sourceData.accounts.length} บัญชี`);
         }
         
+        // ✅ แปลง categories (ไม่มี owner, ไม่ต้องแปลง)
         if (sourceData.categories || sourceData.customCategories) {
             const categories = sourceData.categories || sourceData.customCategories;
             customCategories = categories;
@@ -12160,6 +13113,7 @@ async function importVersionedData(data) {
             console.log("✅ นำเข้าหมวดหมู่");
         }
         
+        // ✅ แปลง budgets (ไม่มี owner, ไม่ต้องแปลง)
         if (sourceData.budgets || sourceData.categoryTargets) {
             const budgets = sourceData.budgets || sourceData.categoryTargets;
             categoryTargets = budgets;
@@ -12167,6 +13121,7 @@ async function importVersionedData(data) {
             console.log("✅ นำเข้าเป้าหมายงบประมาณ");
         }
         
+        // ✅ แปลง transactions
         const transactionsToImport = sourceData.transactions || [];
         if (transactionsToImport.length > 0) {
             console.log(`📥 นำเข้า ${transactionsToImport.length} ธุรกรรม`);
@@ -12184,6 +13139,12 @@ async function importVersionedData(data) {
                     if (!tx.monthKey && tx.rawDate) {
                         const date = new Date(tx.rawDate);
                         tx.monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                    }
+                    
+                    // ✅ แปลง owner สำหรับ Guest mode
+                    if (isGuestMode) {
+                        tx.owner_type = 'guest';
+                        tx.owner_id = guestId;
                     }
                     
                     if (financeDB && financeDB.saveTransaction) {
@@ -12213,18 +13174,35 @@ async function importVersionedData(data) {
             }
         }
         
+        // ✅ แปลง debts
         if (sourceData.debts && Array.isArray(sourceData.debts)) {
+            for (let debt of sourceData.debts) {
+                // ✅ แปลง owner สำหรับ Guest mode
+                if (isGuestMode) {
+                    debt.owner_type = 'guest';
+                    debt.owner_id = guestId;
+                }
+            }
             debts = sourceData.debts;
             localStorage.setItem('fin_debts', JSON.stringify(debts));
             console.log(`✅ นำเข้า ${debts.length} หนี้`);
         }
         
+        // ✅ แปลง payments
         if (sourceData.payments && Array.isArray(sourceData.payments)) {
+            for (let payment of sourceData.payments) {
+                // ✅ แปลง owner สำหรับ Guest mode
+                if (isGuestMode) {
+                    payment.owner_type = 'guest';
+                    payment.owner_id = guestId;
+                }
+            }
             payments = sourceData.payments;
             localStorage.setItem('fin_debt_payments', JSON.stringify(payments));
             console.log(`✅ นำเข้า ${payments.length} การชำระ`);
         }
         
+        // ✅ แปลง settings (ไม่มี owner, ไม่ต้องแปลง)
         if (data.settings || sourceData.settings) {
             const settings = data.settings || sourceData.settings;
             
@@ -12315,22 +13293,195 @@ function triggerMobileRestore() {
 }
         function renderTagList() {
             const search = document.getElementById('tagSearchInput').value.toLowerCase();
-            const allTags = [...new Set(transactions.map(t => t.tag).filter(tag => tag && tag.trim() !== ''))];
+            
+            // ✅ เปลี่ยน: โหลดจาก tags array (ที่ sync จาก MySQL แล้ว) แทนการ map จาก transactions
+            let allTags = [];
+            
+            if (isLoggedIn && tags.length > 0) {
+                // User mode: ใช้ tags จาก backend
+                allTags = tags.map(t => t.name);
+            } else {
+                // Guest mode: ดึงจาก transactions เหมือนเดิม
+                allTags = [...new Set(transactions.map(t => t.tag).filter(tag => tag && tag.trim() !== ''))];
+            }
+            
             const filtered = allTags.filter(tag => tag.toLowerCase().includes(search)).sort();
             const container = document.getElementById('tagListContainer');
-            if (filtered.length === 0) { container.innerHTML = `<div class="p-4 text-center text-slate-400 italic text-[10px]">ไม่พบ TAG</div>`; return; }
-            container.innerHTML = filtered.map(tag => `<div class="p-2 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center dark:bg-slate-800/50 dark:border-slate-700"><span class="font-bold text-[11px] dark:text-white"># ${tag}</span><div class="flex gap-1"><button onclick="prepareEditTag('${tag}')" class="p-1 text-indigo-400 text-xs">✎</button><button onclick="deleteTag('${tag}')" class="p-1 text-rose-400 text-xs">✕</button></div></div>`).join('');
+            
+            if (filtered.length === 0) { 
+                container.innerHTML = `<div class="p-4 text-center text-slate-400 italic text-[10px]">ไม่พบ TAG</div>`; 
+                return; 
+            }
+            
+            container.innerHTML = filtered.map(tag => {
+                // หา id ของ tag (สำหรับ user mode)
+                const tagObj = isLoggedIn ? tags.find(t => t.name === tag) : null;
+                const tagId = tagObj ? tagObj.id : tag;
+                
+                return `<div class="p-2 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center dark:bg-slate-800/50 dark:border-slate-700">
+                    <span class="font-bold text-[11px] dark:text-white"># ${tag}</span>
+                    <div class="flex gap-1">
+                        <button onclick="prepareEditTag('${tag}', '${tagId}')" class="p-1 text-indigo-400 text-xs">✎</button>
+                        <button onclick="deleteTag('${tag}', '${tagId}')" class="p-1 text-rose-400 text-xs">✕</button>
+                    </div>
+                </div>`;
+            }).join('');
         }
-        function prepareEditTag(name) { editingTagName = name; document.getElementById('editTagNameInput').value = name; document.getElementById('tagEditForm').classList.remove('hidden'); }
+        function prepareEditTag(name, id) { 
+            editingTagName = name;
+            editingTagId = id;  // ต้องประกาศตัวแปรนี้ข้างบนด้วย
+            document.getElementById('editTagNameInput').value = name; 
+            document.getElementById('tagEditForm').classList.remove('hidden'); 
+        }
+
+
         function saveTagEdit() {
-            const newName = document.getElementById('editTagNameInput').value.trim(); if (!newName) return;
-            transactions.forEach(t => { if (t.tag === editingTagName) t.tag = newName; });
-            localStorage.setItem('fin_tx_v5', JSON.stringify(transactions)); cancelTagEdit(); renderTagList(); updateUI(); showToast("อัปเดต Tag แล้ว");
+            const newName = document.getElementById('editTagNameInput').value.trim(); 
+            if (!newName) return;
+            
+            const oldName = editingTagName;
+            
+            // Guest mode: แก้ไขแค่ใน transactions
+            if (!isLoggedIn) {
+                transactions.forEach(t => { if (t.tag === oldName) t.tag = newName; });
+                localStorage.setItem('fin_tx_v5', JSON.stringify(transactions));
+                updateUI();
+                renderTagList();
+                cancelTagEdit();
+                showToast("อัปเดต Tag แล้ว (Guest mode)");
+                return;
+            }
+            
+            // User mode: แก้ไขทั้ง tags table และ transactions
+            
+            // 1. อัปเดตชื่อ tag ใน tags array และ MySQL
+            const tagIndex = tags.findIndex(t => t.id === editingTagId);
+            if (tagIndex !== -1) {
+                tags[tagIndex].name = newName;
+                localStorage.setItem('fin_tags', JSON.stringify(tags));
+                
+                // อัปเดต MySQL (ถ้าออนไลน์)
+                if (navigator.onLine) {
+                    updateTagInBackend(editingTagId, newName);
+                } else {
+                    // ออฟไลน์: เก็บในคิวซิงค์
+                    addToSyncQueue({
+                        type: 'update_tag',
+                        tagId: editingTagId,
+                        oldName: oldName,
+                        newName: newName
+                    }, 'update_tag');
+                    showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
+                }
+            }
+            
+            // 2. อัปเดตชื่อ tag ใน transactions ทุกตัว
+            for (const tx of transactions) {
+                if (tx.tag === oldName) {
+                    tx.tag = newName;
+                    // อัปเดตใน backend (ถ้าออนไลน์)
+                    if (isLoggedIn && navigator.onLine) {
+                        updateTransactionInBackend(tx);
+                    }
+                }
+            }
+            
+            // บันทึก localStorage
+            localStorage.setItem('fin_tx_v5', JSON.stringify(transactions.slice(0, 1000)));
+            
+            // อัปเดต UI
+            updateUI();
+            renderTagList();
+            cancelTagEdit();
+            showToast("✅ อัปเดต Tag สำเร็จ");
         }
         function cancelTagEdit() { editingTagName = null; document.getElementById('tagEditForm').classList.add('hidden'); }
-        function deleteTag(name) { showConfirm("ลบประวัติ TAG?", `ชื่อ "${name}" จะหายไปจากทุกรายการ`, () => { transactions.forEach(t => { if (t.tag === name) t.tag = ""; }); localStorage.setItem('fin_tx_v5', JSON.stringify(transactions)); renderTagList(); updateUI(); hideConfirm(); showToast("ลบแล้ว"); }); }
+        function deleteTag(name, id) { 
+            showConfirm("ลบประวัติ TAG?", `ชื่อ "${name}" จะหายไปจากทุกรายการ`, async () => { 
+                
+                // Guest mode: ลบแค่ใน transactions
+                if (!isLoggedIn) {
+                    transactions.forEach(t => { if (t.tag === name) t.tag = ""; });
+                    localStorage.setItem('fin_tx_v5', JSON.stringify(transactions));
+                    renderTagList();
+                    updateUI();
+                    hideConfirm();
+                    showToast("ลบแล้ว (Guest mode)");
+                    return;
+                }
+                
+                // User mode: ลบทั้ง tags table และ transactions
+                
+                // 1. ลบจาก tags array และ MySQL
+                const tagIndex = tags.findIndex(t => t.id === id || t.name === name);
+                if (tagIndex !== -1) {
+                    const tagToDelete = tags[tagIndex];
+                    tags.splice(tagIndex, 1);
+                    localStorage.setItem('fin_tags', JSON.stringify(tags));
+                    
+                    // ลบ MySQL (ถ้าออนไลน์)
+                    if (navigator.onLine) {
+                        await deleteTagFromBackend(id);
+                    } else {
+                        // ออฟไลน์: เก็บในคิวซิงค์
+                        addToSyncQueue({
+                            type: 'delete_tag',
+                            tagId: id,
+                            tagName: name
+                        }, 'delete_tag');
+                        showToast('📦 ออฟไลน์: รอซิงค์อัตโนมัติ', 'info');
+                    }
+                }
+                
+                // 2. ลบ tag ออกจาก transactions ทุกตัว
+                for (const tx of transactions) {
+                    if (tx.tag === name) {
+                        tx.tag = "";
+                        // อัปเดตใน backend (ถ้าออนไลน์)
+                        if (isLoggedIn && navigator.onLine) {
+                            await updateTransactionInBackend(tx);
+                        }
+                    }
+                }
+                
+                // บันทึก localStorage
+                localStorage.setItem('fin_tx_v5', JSON.stringify(transactions.slice(0, 1000)));
+                
+                // อัปเดต UI
+                renderTagList();
+                updateUI();
+                hideConfirm();
+                showToast("🗑️ ลบ Tag สำเร็จ");
+            }); 
+        }
 
-
+async function updateTagInBackend(tagId, newName) {
+    if (!isLoggedIn || !navigator.onLine) return false;
+    
+    try {
+        const response = await fetch(`${API_URL}/tags/${tagId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: currentUser.id,
+                name: newName,
+                color: '#6366f1'
+            })
+        });
+        
+        if (response.ok) {
+            console.log(`✅ Tag updated in backend: ${tagId} -> ${newName}`);
+            return true;
+        } else {
+            const error = await response.json();
+            console.error('Backend error:', error);
+            return false;
+        }
+    } catch (error) {
+        console.error('Error updating tag:', error);
+        return false;
+    }
+}
 
 let sideMenuOpen = false;
 
@@ -12912,6 +14063,24 @@ function updateTransferAccountSelects() {
         return;
     }
     
+    // ✅ ✅ ✅ สำคัญ: กรองบัญชีตาม mode ปัจจุบัน
+    let filteredAccounts = [];
+    
+    if (isLoggedIn) {
+        // User mode: แสดงเฉพาะบัญชีของ user นี้
+        filteredAccounts = accounts.filter(acc => 
+            acc.owner_type === 'user' && acc.owner_id === currentUser.id
+        );
+        console.log(`👤 User mode: แสดง ${filteredAccounts.length} บัญชีใน dropdown โอนเงิน`);
+    } else {
+        // Guest mode: แสดงเฉพาะบัญชีของ guest นี้
+        const guestId = getGuestId();
+        filteredAccounts = accounts.filter(acc => 
+            acc.owner_type === 'guest' && acc.owner_id === guestId
+        );
+        console.log(`👤 Guest mode: แสดง ${filteredAccounts.length} บัญชีใน dropdown โอนเงิน`);
+    }
+    
     const currentFromValue = fromSelect.value;
     const currentToValue = toSelect.value;
     
@@ -12921,13 +14090,14 @@ function updateTransferAccountSelects() {
     let fromOptions = '<option value="">-- เลือกบัญชีต้นทาง --</option>';
     let toOptions = '<option value="">-- เลือกบัญชีปลายทาง --</option>';
     
-    accounts.forEach(acc => {
+    // ✅ ใช้ filteredAccounts แทน accounts
+    filteredAccounts.forEach(acc => {
         const balance = getAccountBalance(acc.id);
         const selected = (acc.id === currentFromValue) ? 'selected' : '';
         fromOptions += `<option value="${acc.id}" ${selected}>${acc.icon} ${acc.name} (฿${balance.toLocaleString()})</option>`;
     });
     
-    accounts.forEach(acc => {
+    filteredAccounts.forEach(acc => {
         const balance = getAccountBalance(acc.id);
         const selected = (acc.id === currentToValue) ? 'selected' : '';
         toOptions += `<option value="${acc.id}" ${selected}>${acc.icon} ${acc.name} (฿${balance.toLocaleString()})</option>`;
@@ -15655,6 +16825,8 @@ async function login() {
             renderCalendar();
             renderAccountsList();
             
+            
+            
             // ✅ รีเฟรชหน้าปัจจุบัน
             const currentPage = getCurrentPage();
             switch(currentPage) {
@@ -15662,7 +16834,15 @@ async function login() {
                 case 'analysis': refreshAnalysisCharts(); break;
                 case 'yearly': updateYearlyUI(); break;
                 case 'debt': renderDebtPage(); break;
-                case 'accounts': renderAccountsList(); break;
+                case 'accounts':
+                    console.log('🔄 Refreshing accounts page...');
+                    renderAccountsList();                    // รายการบัญชี
+                    updateAccountSelect();                   // dropdown form บันทึก (desktop)
+                    updateMobileAccountSelect();             // dropdown form บันทึก (mobile)
+                    updateAccountFilterDropdown();           // ตัวกรองบัญชีทุกหน้า
+                    updateTransferAccountSelects();          // dropdown โอนเงิน (from/to)
+                    initTransferForm();                      // ✅ รีเฟรชฟอร์มโอนเงินทั้งหมด
+                    break;
             }
             
             showToast('✅ เข้าสู่ระบบสำเร็จ!', 'success');
@@ -15928,24 +17108,45 @@ async function loadAccountsFromBackend() {
         const response = await fetch(`${API_URL}/accounts/${currentUser.id}`);
         
         if (!response.ok) {
-            console.warn('Failed to load accounts from backend');
+            console.warn('Failed to load accounts from backend, status:', response.status);
             return;
         }
         
         const serverAccounts = await response.json();
         
         if (serverAccounts.length > 0) {
-            accounts = serverAccounts.map(acc => ({
-                id: acc.id,
-                name: acc.name,
-                type: acc.type,
-                icon: acc.icon,
-                initialBalance: acc.initialBalance || 0,  // ✅ ต้องมี
-                isDefault: acc.isDefault || false,
-                createdAt: acc.createdAt,
-                updatedAt: acc.updatedAt
-            }));
+            // ✅ แปลงข้อมูลจาก backend (รวม manualAdjustment และ lastAdjustment)
+            const convertedAccounts = serverAccounts.map(acc => {
+                // หา account เดิมใน local (ถ้ามี) เพื่อรักษา balanceAdjustments
+                const existingAccount = accounts.find(a => a.id == acc.id);
+                
+                return {
+                    id: acc.id.toString(),
+                    name: acc.name,
+                    type: acc.type,
+                    icon: acc.icon,
+                    initialBalance: parseFloat(acc.initialBalance) || 0,
+                    manualAdjustment: parseFloat(acc.manualAdjustment) || 0,  // ✅ ดึงจาก MySQL
+                    lastAdjustment: acc.lastAdjustment || null,
+                    isDefault: acc.isDefault || false,
+                    createdAt: acc.createdAt,
+                    updatedAt: acc.updatedAt,
+                    backendId: acc.id,
+                    owner_type: 'user',
+                    owner_id: currentUser.id,
+                    // ✅ รักษา balanceAdjustments เดิม (ถ้ามี)
+                    balanceAdjustments: existingAccount?.balanceAdjustments || []
+                };
+            });
             
+            // รวมกับ local accounts (guest)
+            const localAccounts = accounts.filter(a => 
+                a.owner_type === 'guest' || !a.backendId
+            );
+            
+            accounts = [...convertedAccounts, ...localAccounts];
+            
+            // หา default account
             const defaultAccount = accounts.find(a => a.isDefault);
             if (defaultAccount) {
                 currentAccountId = defaultAccount.id;
@@ -15954,12 +17155,18 @@ async function loadAccountsFromBackend() {
                 currentAccountId = accounts[0].id;
             }
             
-            saveAccounts();
+            // ✅ ถ้า saveToLocalEnabled ให้บันทึก localStorage ด้วย
+            if (saveToLocalEnabled) {
+                localStorage.setItem('fin_accounts', JSON.stringify(accounts));
+            }
             
-            console.log(`✅ โหลด ${accounts.length} accounts จาก backend`);
+            console.log(`✅ โหลด ${accounts.length} accounts จาก backend (manualAdjustment: ${convertedAccounts.map(a => a.manualAdjustment).join(', ')})`);
         } else {
-            console.log('⚠️ ไม่มี accounts จาก backend');
+            console.log('⚠️ ไม่มี accounts จาก backend, ใช้ local accounts แทน');
         }
+        
+        // แปลง legacy accounts ถ้ามี
+        await migrateLegacyAccounts();
         
     } catch (error) {
         console.error('Error loading accounts:', error);
@@ -16353,9 +17560,15 @@ async function logout() {
         updateLocalSaveCheckbox();
         
         updateAuthButtons();
+
+        const settingsModal = document.getElementById('settingsModal');
+                if (settingsModal) settingsModal.classList.add('hidden');
         hideConfirm();
         
         showToast('👋 ออกจากระบบสำเร็จ', 'success');
+        setTimeout(() => {
+            window.location.reload();
+        }, 500);
         
         updateUI();
     });
@@ -16621,51 +17834,46 @@ async function convertGuestDataToUser() {
         'แปลงข้อมูลจาก Guest สู่ User?',
         `⚠️ คำเตือน:\n\n` +
         `• ข้อมูล Guest (${getGuestId()}) จะถูกย้ายไปยัง User (${currentUser.username})\n` +
-        `• ข้อมูลเดิมของ User อาจถูกเขียนทับ (กรณี ID ซ้ำ)\n` +
+        `• จะแปลง: Transactions, Debts, Payments, Accounts\n` +
+        `• ข้อมูลเดิมของ User จะถูกรักษาไว้ (ไม่ลบ)\n` +
+        `• รายการที่ซ้ำกับที่มีอยู่จะถูกข้าม\n` +
+        `• หลังจากแปลงสำเร็จ ข้อมูล Guest จะถูกล้างออกจากเครื่อง\n` +
         `• ไม่สามารถยกเลิกได้\n\n` +
         `ยืนยันที่จะดำเนินการ?`,
         async () => {
             try {
-                showToast('🔄 กำลังแปลงข้อมูล...', 'info');
+                showToast('🔄 กำลังตรวจสอบและแปลงข้อมูล...', 'info');
                 
-                // 1. ดึงข้อมูล Guest จาก localStorage
+                // ============================================
+                // 1. ดึงข้อมูล Guest
+                // ============================================
                 const guestId = getGuestId();
                 const guestData = {
                     transactions: [],
                     debts: [],
                     payments: [],
-                    accounts: [],
-                    categories: [],
-                    budgets: []
+                    accounts: []
                 };
                 
-                // ดึง transactions จาก IndexedDB
                 const allTransactions = await financeDB.getAllTransactions();
                 guestData.transactions = allTransactions.filter(t => 
                     t.owner_type === 'guest' && t.owner_id === guestId
                 );
                 
-                // ดึง debts จาก localStorage
                 const storedDebts = JSON.parse(localStorage.getItem('fin_debts') || '[]');
                 guestData.debts = storedDebts.filter(d => 
                     d.owner_type === 'guest' && d.owner_id === guestId
                 );
                 
-                // ดึง payments จาก localStorage
                 const storedPayments = JSON.parse(localStorage.getItem('fin_debt_payments') || '[]');
                 guestData.payments = storedPayments.filter(p => 
                     p.owner_type === 'guest' && p.owner_id === guestId
                 );
                 
-                // ดึง accounts (ปกติ accounts จะเป็นของ user อยู่แล้ว)
                 const storedAccounts = JSON.parse(localStorage.getItem('fin_accounts') || '[]');
                 guestData.accounts = storedAccounts.filter(a => 
                     a.owner_type === 'guest' && a.owner_id === guestId
                 );
-                
-                // ดึง categories
-                const storedCategories = JSON.parse(localStorage.getItem('fin_custom_cats') || '{}');
-                // categories เป็น object พิเศษ ต้องแปลงให้มี owner fields
                 
                 console.log(`📊 พบข้อมูล Guest:`, {
                     transactions: guestData.transactions.length,
@@ -16674,128 +17882,376 @@ async function convertGuestDataToUser() {
                     accounts: guestData.accounts.length
                 });
                 
-                if (guestData.transactions.length === 0 && guestData.debts.length === 0) {
+                if (guestData.transactions.length === 0 && guestData.debts.length === 0 && 
+                    guestData.payments.length === 0 && guestData.accounts.length === 0) {
                     showToast('ℹ️ ไม่พบข้อมูล Guest ที่ต้องการแปลง', 'info');
                     hideConfirm();
                     return;
                 }
                 
-                // 2. แปลง owner fields
-                const convertedData = {
-                    transactions: guestData.transactions.map(t => ({
-                        ...t,
-                        owner_type: 'user',
-                        owner_id: currentUser.id,
-                        id: t.id.toString(), // รักษา ID เดิม
-                        updatedAt: new Date().toISOString()
-                    })),
-                    debts: guestData.debts.map(d => ({
-                        ...d,
-                        owner_type: 'user',
-                        owner_id: currentUser.id,
-                        updatedAt: new Date().toISOString()
-                    })),
-                    payments: guestData.payments.map(p => ({
-                        ...p,
-                        owner_type: 'user',
-                        owner_id: currentUser.id,
-                        updatedAt: new Date().toISOString()
-                    })),
-                    accounts: guestData.accounts.map(a => ({
-                        ...a,
-                        owner_type: 'user',
-                        owner_id: currentUser.id,
-                        updatedAt: new Date().toISOString()
-                    }))
-                };
+                // ============================================
+                // 2. โหลดข้อมูลปัจจุบันของ User
+                // ============================================
+                console.log('📥 โหลดข้อมูลปัจจุบันของ User...');
+                const [existingTransactions, existingDebts, existingPayments, existingAccounts] = await Promise.all([
+                    fetch(`${API_URL}/transactions/${currentUser.id}`).then(res => res.json()).catch(() => []),
+                    fetch(`${API_URL}/debts/${currentUser.id}`).then(res => res.json()).catch(() => []),
+                    fetch(`${API_URL}/debt-payments?user_id=${currentUser.id}`).then(res => res.json()).catch(() => []),
+                    fetch(`${API_URL}/accounts/${currentUser.id}`).then(res => res.json()).catch(() => [])
+                ]);
                 
-                console.log(`🔄 แปลงข้อมูลเสร็จ:`, {
-                    transactions: convertedData.transactions.length,
-                    debts: convertedData.debts.length,
-                    payments: convertedData.payments.length
+                // สร้าง Sets สำหรับตรวจสอบข้อมูลซ้ำ
+                const existingTransactionKeys = new Set();
+                const existingDebtKeys = new Set();
+                const existingPaymentKeys = new Set();
+                const existingAccountKeys = new Set();
+                
+                existingTransactions.forEach(tx => {
+                    existingTransactionKeys.add(`${tx.date}|${tx.amount}|${tx.description}|${tx.category}`);
+                    if (tx.id) existingTransactionKeys.add(`id_${tx.id}`);
+                    if (tx.original_payment_id) existingTransactionKeys.add(`payment_${tx.original_payment_id}`);
                 });
                 
-                // 3. บันทึกไปที่ backend (MySQL)
-                showToast('📤 กำลังบันทึกไปยังเซิร์ฟเวอร์...', 'info');
+                existingDebts.forEach(debt => {
+                    existingDebtKeys.add(`${debt.name}|${debt.total_amount}`);
+                    if (debt.id) existingDebtKeys.add(`id_${debt.id}`);
+                });
                 
-                let successCount = 0;
-                let errorCount = 0;
+                existingPayments.forEach(payment => {
+                    existingPaymentKeys.add(`${payment.debt_id}|${payment.amount}|${payment.payment_date}`);
+                    if (payment.id) existingPaymentKeys.add(`id_${payment.id}`);
+                });
                 
-                // บันทึก transactions
-                for (const tx of convertedData.transactions) {
+                existingAccounts.forEach(account => {
+                    existingAccountKeys.add(`${account.name}|${account.type}`);
+                    if (account.id) existingAccountKeys.add(`id_${account.id}`);
+                });
+                
+                // ============================================
+                // 3. โหลด categories
+                // ============================================
+                const categoriesResponse = await fetch(`${API_URL}/categories/${currentUser.id}`);
+                const userCategories = await categoriesResponse.json();
+                
+                const categoryNameToId = {};
+                userCategories.income?.forEach(cat => { categoryNameToId[cat.label] = cat.id; });
+                userCategories.spending?.forEach(cat => { categoryNameToId[cat.label] = cat.id; });
+                userCategories.investment?.forEach(cat => { categoryNameToId[cat.label] = cat.id; });
+                
+                // ============================================
+                // 4. แปลงและบันทึก ACCOUNTS
+                // ============================================
+                const uniqueAccounts = guestData.accounts.filter(acc => {
+                    const key = `${acc.name}|${acc.type}`;
+                    const isDuplicate = existingAccountKeys.has(key) || existingAccountKeys.has(`id_${acc.id}`);
+                    return !isDuplicate;
+                });
+                
+                console.log(`📊 accounts: จะบันทึก ${uniqueAccounts.length} รายการ`);
+                
+                const accountIdMap = new Map();
+                let accountSuccessCount = 0;
+                
+                for (const acc of uniqueAccounts) {
                     try {
-                        // ตรวจสอบว่ามี transaction นี้ใน backend หรือยัง
-                        const checkResponse = await fetch(`${API_URL}/transactions/${currentUser.id}?month=${tx.monthKey}`);
-                        const existing = await checkResponse.json();
+                        const response = await fetch(`${API_URL}/accounts`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                user_id: currentUser.id,
+                                name: acc.name,
+                                type: acc.type,
+                                icon: acc.icon || '🏦',
+                                initialBalance: acc.initialBalance || 0,
+                                isDefault: false
+                            })
+                        });
                         
-                        const exists = existing.some(e => e.id === tx.id || e.originalPaymentId === tx.originalPaymentId);
+                        if (response.ok) {
+                            const result = await response.json();
+                            accountIdMap.set(acc.id, result.id.toString());
+                            accountSuccessCount++;
+                            console.log(`✅ บันทึก account สำเร็จ: ${acc.name} → ID ${result.id}`);
+                        }
+                    } catch (error) {
+                        console.error(`❌ Error converting account:`, error);
+                    }
+                }
+                
+                // ============================================
+                // 5. แปลงและบันทึก DEBTS
+                // ============================================
+                const uniqueDebts = guestData.debts.filter(debt => {
+                    const key = `${debt.name}|${debt.totalAmount}`;
+                    const isDuplicate = existingDebtKeys.has(key) || existingDebtKeys.has(`id_${debt.id}`);
+                    return !isDuplicate;
+                });
+                
+                console.log(`📊 debts: จะบันทึก ${uniqueDebts.length} รายการ`);
+                
+                const debtIdMap = new Map();
+                let debtSuccessCount = 0;
+                
+                for (const debt of uniqueDebts) {
+                    try {
+                        let dbCategoryId = categoryNameToId[debt.categoryName];
+                        if (!dbCategoryId) {
+                            const matchingCat = userCategories.spending?.find(c => 
+                                c.label === debt.categoryName || c.id === debt.categoryId
+                            );
+                            dbCategoryId = matchingCat?.id || userCategories.spending?.[0]?.id;
+                        }
                         
-                        if (!exists) {
-                            const result = await saveTransactionToBackend(tx);
-                            if (result && result.success) {
-                                successCount++;
-                            } else {
-                                errorCount++;
+                        const response = await fetch(`${API_URL}/debts`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                user_id: currentUser.id,
+                                name: debt.name,
+                                categoryId: dbCategoryId,
+                                tag: debt.tag || '#ผ่อนหนี้',
+                                totalAmount: debt.totalAmount,
+                                monthlyPayment: debt.monthlyPayment,
+                                interestRate: debt.interestRate || 0,
+                                dueDate: debt.dueDate,
+                                startDate: debt.startDate,
+                                status: debt.status || 'open'
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            const result = await response.json();
+                            debtIdMap.set(debt.id, result.id.toString());
+                            debtSuccessCount++;
+                            console.log(`✅ บันทึก debt สำเร็จ: ${debt.name} → ID ${result.id}`);
+                        }
+                    } catch (error) {
+                        console.error(`❌ Error converting debt:`, error);
+                    }
+                }
+                
+                // ============================================
+                // 6. แปลงและบันทึก PAYMENTS
+                // ============================================
+                const uniquePayments = guestData.payments.filter(payment => {
+                    const key = `${payment.debtId}|${payment.amount}|${payment.date}`;
+                    const isDuplicate = existingPaymentKeys.has(key) || existingPaymentKeys.has(`id_${payment.id}`);
+                    return !isDuplicate;
+                });
+                
+                console.log(`📊 payments: จะบันทึก ${uniquePayments.length} รายการ`);
+                
+                let paymentSuccessCount = 0;
+                
+                for (const payment of uniquePayments) {
+                    try {
+                        let newDebtId = debtIdMap.get(payment.debtId);
+                        if (!newDebtId) {
+                            const matchedDebt = existingDebts.find(d => d.id == payment.debtId);
+                            if (matchedDebt) newDebtId = matchedDebt.id.toString();
+                        }
+                        
+                        if (!newDebtId) continue;
+                        
+                        let newAccountId = payment.accountId;
+                        if (payment.accountId && accountIdMap.has(payment.accountId)) {
+                            newAccountId = accountIdMap.get(payment.accountId);
+                        }
+                        
+                        const response = await fetch(`${API_URL}/debt-payments`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                user_id: currentUser.id,
+                                debtId: parseInt(newDebtId),
+                                accountId: newAccountId,
+                                amount: payment.amount,
+                                payment_date: payment.date,
+                                note: payment.note || ''
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            paymentSuccessCount++;
+                            console.log(`✅ บันทึก payment สำเร็จ: ${payment.amount} บาท`);
+                        }
+                    } catch (error) {
+                        console.error(`❌ Error converting payment:`, error);
+                    }
+                }
+                
+                // ============================================
+                // 7. แปลงและบันทึก TRANSACTIONS
+                // ============================================
+                const uniqueTransactions = guestData.transactions.filter(tx => {
+                    const key = `${tx.rawDate}|${tx.amount}|${tx.desc}|${tx.category}`;
+                    const isDuplicate = existingTransactionKeys.has(key) || 
+                                       existingTransactionKeys.has(`id_${tx.id}`) ||
+                                       (tx.originalPaymentId && existingTransactionKeys.has(`payment_${tx.originalPaymentId}`));
+                    return !isDuplicate;
+                });
+                
+                console.log(`📊 transactions: จะบันทึก ${uniqueTransactions.length} รายการ`);
+                
+                let txSuccessCount = 0;
+                
+                for (const tx of uniqueTransactions) {
+                    try {
+                        let transactionToSave;
+                        let newAccountId = tx.accountId;
+                        
+                        if (tx.accountId && accountIdMap.has(tx.accountId)) {
+                            newAccountId = accountIdMap.get(tx.accountId);
+                        }
+                        
+                        if (tx.isDebtPayment && tx.originalDebtId) {
+                            let newDebtId = debtIdMap.get(tx.originalDebtId);
+                            if (!newDebtId) {
+                                const matchedDebt = existingDebts.find(d => d.id == tx.originalDebtId);
+                                if (matchedDebt) newDebtId = matchedDebt.id.toString();
                             }
+                            
+                            transactionToSave = {
+                                user_id: currentUser.id,
+                                type: tx.type,
+                                amount: tx.amount,
+                                desc: tx.desc,
+                                category: tx.category,
+                                tag: tx.tag,
+                                icon: tx.icon,
+                                rawDate: tx.rawDate,
+                                month_key: tx.monthKey,
+                                accountId: newAccountId,
+                                isDebtPayment: true,
+                                originalDebtId: newDebtId ? parseInt(newDebtId) : null,
+                                originalPaymentId: tx.originalPaymentId
+                            };
                         } else {
-                            console.log(`⏭️ ข้าม transaction ซ้ำ: ${tx.id}`);
+                            transactionToSave = {
+                                user_id: currentUser.id,
+                                type: tx.type,
+                                amount: tx.amount,
+                                desc: tx.desc,
+                                category: tx.category,
+                                tag: tx.tag,
+                                icon: tx.icon,
+                                rawDate: tx.rawDate,
+                                month_key: tx.monthKey,
+                                accountId: newAccountId,
+                                isDebtPayment: false,
+                                originalDebtId: null,
+                                originalPaymentId: null
+                            };
                         }
-                    } catch (txError) {
-                        console.error(`❌ Error saving transaction ${tx.id}:`, txError);
-                        errorCount++;
+                        
+                        const response = await fetch(`${API_URL}/transactions`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(transactionToSave)
+                        });
+                        
+                        if (response.ok) {
+                            txSuccessCount++;
+                            console.log(`✅ บันทึก transaction สำเร็จ: ${tx.desc}`);
+                        }
+                    } catch (error) {
+                        console.error(`❌ Error saving transaction:`, error);
                     }
                 }
                 
-                // บันทึก debts
-                for (const debt of convertedData.debts) {
-                    try {
-                        const exists = await checkDebtExists(debt.id);
-                        if (!exists) {
-                            await saveDebtToBackend(debt);
-                            successCount++;
-                        }
-                    } catch (debtError) {
-                        console.error(`❌ Error saving debt ${debt.id}:`, debtError);
-                        errorCount++;
-                    }
-                }
-                
-                // บันทึก payments
-                for (const payment of convertedData.payments) {
-                    try {
-                        const exists = await checkPaymentExists(payment.id);
-                        if (!exists) {
-                            await saveDebtPaymentToBackend(payment);
-                            successCount++;
-                        }
-                    } catch (paymentError) {
-                        console.error(`❌ Error saving payment ${payment.id}:`, paymentError);
-                        errorCount++;
-                    }
-                }
-                
-                // 4. รีเฟรชข้อมูล
-                showToast('🔄 โหลดข้อมูลใหม่...', 'info');
+                // ============================================
+                // 8. โหลดข้อมูลใหม่ทั้งหมดจาก backend
+                // ============================================
+                showToast('🔄 โหลดข้อมูลใหม่จากเซิร์ฟเวอร์...', 'info');
                 await Promise.all([
                     loadTransactionsFromBackend(),
                     loadDebtsFromBackend(),
-                    loadPaymentsFromBackend()
+                    loadPaymentsFromBackend(),
+                    loadAccountsFromBackend()
                 ]);
                 
                 transactions = backendTransactions;
                 
-                // 5. อัปเดต UI
+                // ============================================
+                // 9. ✅ ล้างข้อมูล Guest ออกจาก LocalStorage และ IndexedDB
+                // ============================================
+                console.log('🗑️ เริ่มล้างข้อมูล Guest...');
+                showToast('🗑️ กำลังล้างข้อมูล Guest ออกจากเครื่อง...', 'info');
+                
+                // 9.1 ล้าง transactions ของ Guest ออกจาก IndexedDB
+                for (const tx of guestData.transactions) {
+                    await financeDB.deleteTransaction(tx.id);
+                    console.log(`🗑️ ลบ transaction: ${tx.id}`);
+                }
+                
+                // 9.2 ล้าง debts ของ Guest ออกจาก localStorage
+                const remainingDebts = JSON.parse(localStorage.getItem('fin_debts') || '[]');
+                const filteredDebts = remainingDebts.filter(d => 
+                    !(d.owner_type === 'guest' && d.owner_id === guestId)
+                );
+                localStorage.setItem('fin_debts', JSON.stringify(filteredDebts));
+                console.log(`🗑️ ลบ debts: ${guestData.debts.length} รายการ, คงเหลือ ${filteredDebts.length} รายการ`);
+                
+                // 9.3 ล้าง payments ของ Guest ออกจาก localStorage
+                const remainingPayments = JSON.parse(localStorage.getItem('fin_debt_payments') || '[]');
+                const filteredPayments = remainingPayments.filter(p => 
+                    !(p.owner_type === 'guest' && p.owner_id === guestId)
+                );
+                localStorage.setItem('fin_debt_payments', JSON.stringify(filteredPayments));
+                console.log(`🗑️ ลบ payments: ${guestData.payments.length} รายการ, คงเหลือ ${filteredPayments.length} รายการ`);
+                
+                // 9.4 ล้าง accounts ของ Guest ออกจาก localStorage
+                const remainingAccounts = JSON.parse(localStorage.getItem('fin_accounts') || '[]');
+                const filteredAccounts = remainingAccounts.filter(a => 
+                    !(a.owner_type === 'guest' && a.owner_id === guestId)
+                );
+                localStorage.setItem('fin_accounts', JSON.stringify(filteredAccounts));
+                console.log(`🗑️ ลบ accounts: ${guestData.accounts.length} รายการ, คงเหลือ ${filteredAccounts.length} รายการ`);
+                
+                // 9.5 อัปเดต accounts array ใน memory
+                accounts = filteredAccounts;
+                
+                // 9.6 clear cache
+                await financeDB.clearCache();
+                
+                console.log('✅ ล้างข้อมูล Guest เสร็จสมบูรณ์');
+                
+                // ============================================
+                // 10. อัปเดต UI
+                // ============================================
                 updateUI();
                 renderCalendar();
                 renderDebtPage();
                 refreshAnalysisCharts();
+                renderAccountsList();
+                updateAccountSelect();
+                updateAccountFilterDropdown();
                 
-                showToast(`✅ แปลงข้อมูลสำเร็จ! (สำเร็จ: ${successCount}, ผิดพลาด: ${errorCount})`, 'success');
+                // ============================================
+                // 11. แสดงสรุปผล
+                // ============================================
+                const summary = `✅ แปลงข้อมูลสำเร็จ!
+
+🏦 Accounts: บันทึก ${accountSuccessCount} / ลบ ${guestData.accounts.length}
+📊 Debts: บันทึก ${debtSuccessCount} / ลบ ${guestData.debts.length}
+💳 Payments: บันทึก ${paymentSuccessCount} / ลบ ${guestData.payments.length}
+📝 Transactions: บันทึก ${txSuccessCount} / ลบ ${guestData.transactions.length}
+
+ข้อมูล Guest ถูกล้างออกจากเครื่องเรียบร้อยแล้ว`;
+
+                alert(summary);
+                window.location.reload();
+
+                // ปิด modal
+                const settingsModal = document.getElementById('settingsModal');
+                if (settingsModal) settingsModal.classList.add('hidden');
                 hideConfirm();
                 
             } catch (error) {
                 console.error('❌ Error converting data:', error);
-                showToast(`❌ แปลงข้อมูลไม่สำเร็จ: ${error.message}`, 'error');
+                alert(`❌ แปลงข้อมูลไม่สำเร็จ: ${error.message}`);
+                const settingsModal = document.getElementById('settingsModal');
+                if (settingsModal) settingsModal.classList.add('hidden');
                 hideConfirm();
             }
         }
