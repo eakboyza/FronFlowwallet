@@ -6266,6 +6266,7 @@ function changeAnalysisPeriodType() {
 
 
 function updateYearlyUI() {
+    hideYearlyTooltip();
     document.getElementById('displayYearText').innerText = displayYear;
     
     const inc = Array(12).fill(0);  
@@ -6493,34 +6494,128 @@ function updateYearlyUI() {
     
     if (yearlyChart) yearlyChart.destroy();
     yearlyChart = new Chart(document.getElementById('yearlyChart').getContext('2d'), {
-        type: 'bar', 
-        data: { 
-            labels: monthNames, 
-            datasets: [
-                { label: 'รายได้', data: inc, backgroundColor: '#10b981', barThickness: 12, stack: 's0' }, 
-                { label: 'ลงทุน', data: inv, backgroundColor: '#fbbf24', barThickness: 12, stack: 's1' }, 
-                { label: 'ใช้จ่าย', data: spd, backgroundColor: '#f43f5e', barThickness: 12, stack: 's1' }
-            ] 
-        }, 
-        options: { 
-            responsive: true, 
-            maintainAspectRatio: false, 
-            plugins: { 
-                legend: { display: false } 
+    type: 'bar', 
+    data: { 
+        labels: monthNames, 
+        datasets: [
+            { label: 'รายได้', data: inc, backgroundColor: '#10b981', barThickness: 12, order: 2, stack: 's1' }, 
+            { label: 'ลงทุน', data: inv, backgroundColor: '#fbbf24', barThickness: 10, order: 1, stack: 's1' }, 
+            { label: 'ใช้จ่าย', data: spd, backgroundColor: '#f43f5e', barThickness: 10, order: 1, stack: 's1' }
+        ] 
+    }, 
+    options: { 
+        responsive: true, 
+        maintainAspectRatio: false, 
+        plugins: { 
+    legend: { display: false },
+    tooltip: {
+        enabled: false,
+        external: function(context) {
+            let chart = context.chart;
+            let tooltip = context.tooltip;
+            
+            let tooltipEl = document.getElementById('custom-tooltip');
+            if (!tooltipEl) {
+                tooltipEl = document.createElement('div');
+                tooltipEl.id = 'custom-tooltip';
+                tooltipEl.style.position = 'absolute';
+                tooltipEl.style.background = 'rgba(0,0,0,0.85)';
+                tooltipEl.style.color = '#fff';
+                tooltipEl.style.padding = '8px 12px';
+                tooltipEl.style.borderRadius = '8px';
+                tooltipEl.style.fontSize = '12px';
+                tooltipEl.style.pointerEvents = 'none';
+                tooltipEl.style.zIndex = '9999';
+                tooltipEl.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+                document.body.appendChild(tooltipEl);
+            }
+            
+            // ✅ กรณีไม่มีข้อมูล หรือ tooltip ควรซ่อน
+            if (tooltip.opacity === 0 || !tooltip.dataPoints || tooltip.dataPoints.length === 0) {
+                tooltipEl.style.opacity = 0;
+                return;
+            }
+            
+            const activeElements = chart.getActiveElements();
+            if (activeElements.length === 0) {
+                tooltipEl.style.opacity = 0;
+                return;
+            }
+            
+            const index = activeElements[0].index;
+            const monthName = chart.data.labels[index];
+            
+            const items = [];
+            const order = ['รายได้', 'ใช้จ่าย', 'ลงทุน'];
+            
+            for (let i = 0; i < chart.data.datasets.length; i++) {
+                const dataset = chart.data.datasets[i];
+                const value = dataset.data[index];
+                
+                if (value && value > 0) {
+                    items.push({
+                        label: dataset.label,
+                        value: value,
+                        color: dataset.backgroundColor
+                    });
+                }
+            }
+            
+            items.sort((a, b) => {
+                return order.indexOf(a.label) - order.indexOf(b.label);
+            });
+            
+            if (items.length === 0) {
+                tooltipEl.style.opacity = 0;
+                return;
+            }
+            
+            let html = `
+                <div style="font-weight: bold; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.2);">
+                    📅 ${monthName}
+                </div>
+            `;
+            
+            for (let item of items) {
+                html += `
+                    <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                        <span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: ${item.color}; margin-right: 8px;"></span>
+                        <span>${item.label}: ฿${item.value.toLocaleString()}</span>
+                    </div>
+                `;
+            }
+            
+            tooltipEl.innerHTML = html;
+            
+            const pos = chart.canvas.getBoundingClientRect();
+            tooltipEl.style.left = pos.left + tooltip.caretX + 'px';
+            tooltipEl.style.top = pos.top + tooltip.caretY + 'px';
+            tooltipEl.style.opacity = 1;
+        }
+    }
+},  
+        scales: { 
+            y: { 
+                stacked: false,
+                beginAtZero: true, 
+                grid: { color: '#334155' },
+                ticks: { color: '#ffffff', font: { size: 11 } }
             }, 
-            scales: { 
-                y: { 
-                    beginAtZero: true, 
-                    grid: { color: '#334155' },
-                    ticks: { color: '#ffffff', font: { size: 11 } }
-                }, 
-                x: { 
-                    grid: { display: false },
-                    ticks: { color: '#ffffff', font: { size: 11 } }
-                } 
+            x: { 
+                stacked: true,
+                grid: { display: false },
+                ticks: { color: '#ffffff', font: { size: 11 } }
             } 
         } 
-    });
+    } 
+});
+}
+
+function hideYearlyTooltip() {
+    const tooltipEl = document.getElementById('custom-tooltip');
+    if (tooltipEl) {
+        tooltipEl.style.opacity = 0;
+    }
 }
 
 function updateYearlyTagsUI() {
@@ -8729,7 +8824,8 @@ function switchPage(page) {
         updateAnalysisPeriodText();
         refreshAnalysisCharts();
     } else if(page === 'yearly') {
-        updateYearlyUI(); 
+        updateYearlyUI();
+        hideYearlyTooltip(); 
     } else if(page === 'accounts') {
         renderAccountsList();
         
@@ -12639,7 +12735,34 @@ async function loadSavedView() {
 }
 
 
-        function triggerRestore() { document.getElementById('restoreFileInput').click(); }
+        function triggerRestore() {
+    if (isMobile()) {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json,.JSON';
+        input.style.display = 'none';
+        
+        input.onchange = function(e) {
+            // ✅ ปิด modal ก่อน
+            toggleSettingsModal();
+            
+            handleRestoreFile(e.target);
+            setTimeout(() => {
+                if (input.parentElement) {
+                    document.body.removeChild(input);
+                }
+            }, 500);
+        };
+        
+        document.body.appendChild(input);
+        input.click();
+    } else {
+        // ✅ ปิด modal ก่อน
+        toggleSettingsModal();
+        
+        document.getElementById('restoreFileInput').click();
+    }
+}
  async function handleRestoreFile(input) { 
     const file = input.files[0]; 
     if (!file) return;
